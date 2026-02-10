@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/ui/missing_path.rs:5:1
+  |
+5 | #[api]
+  | ^^^^^^
+  |
+  = help: message: Failed to parse #[api_handler] arguments: Error { kind: MissingField("path"), locations: [], span: Some(#0 bytes(67..78)) }

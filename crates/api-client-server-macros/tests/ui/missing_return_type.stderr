@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/ui/missing_return_type.rs:5:1
+  |
+5 | #[api]
+  | ^^^^^^
+  |
+  = help: message: Handler `health` must have a return type

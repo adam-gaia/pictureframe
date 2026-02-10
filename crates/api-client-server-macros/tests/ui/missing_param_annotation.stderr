@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/ui/missing_param_annotation.rs:5:1
+  |
+5 | #[api]
+  | ^^^^^^
+  |
+  = help: message: Parameter `req` in `create_user` must be annotated with #[body] or #[path]

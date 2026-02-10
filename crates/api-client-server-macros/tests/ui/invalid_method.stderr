@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/ui/invalid_method.rs:5:1
+  |
+5 | #[api]
+  | ^^^^^^
+  |
+  = help: message: Unsupported HTTP method: TRACE

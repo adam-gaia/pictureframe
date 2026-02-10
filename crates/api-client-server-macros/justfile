@@ -1,0 +1,36 @@
+build:
+    cargo lbuild
+
+test:
+    cargo nextest run
+
+run: build
+    RUST_LOG=debug cargo lrun
+
+# Run all tests
+test-all:
+    cargo test --workspace
+
+# Run unit tests only (fast)
+test-unit:
+    cargo test --package api-macros --lib
+
+# Run compile-fail tests
+test-ui:
+    cargo test --package api-macros ui
+
+# Run expansion tests
+test-expand:
+    cargo test --package api-macros expand
+
+# Run integration tests
+test-integration:
+    cargo test --package api-example
+
+# Update trybuild snapshots (run when error messages change)
+test-ui-update:
+    TRYBUILD=overwrite cargo test --package api-macros ui
+
+# Update macrotest snapshots (run when generated code changes)
+test-expand-update:
+    MACROTEST=overwrite cargo test --package api-macros expand
