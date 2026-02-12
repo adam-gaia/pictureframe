@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::{CreateUserRequest, CreateUserResponse, GetUserResponse, MyServerApp};
+use common::{CreateUserRequest, CreateUserResponse, GetUserResponse, ListUsersResponse, MyServerApp};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -248,14 +248,15 @@ async fn test_404_partial_path() {
     let router = test_router();
 
     let request = Request::builder()
-        .method("GET")
+        .method("PUT")
         .uri("/users")
-        .body(Body::empty())
+        .header("content-type", "application/json")
+        .body(Body::from("{}"))
         .unwrap();
 
     let response = router.oneshot(request).await.unwrap();
 
-    // GET /users doesn't exist (only POST /users)
+    // PUT /users doesn't exist (only GET and POST /users)
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
@@ -354,4 +355,102 @@ async fn test_get_user_max_id() {
 
     let body: GetUserResponse = json_body(response.into_body()).await;
     assert_eq!(body.id.0, u32::MAX);
+}
+
+// ── GET /users (query params) tests ──────────────────────────────────────
+
+#[tokio::test]
+async fn test_list_users_no_query_params() {
+    let router = test_router();
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/users")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = router.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: ListUsersResponse = json_body(response.into_body()).await;
+    assert_eq!(body.users.len(), 2);
+    assert_eq!(body.page, 1); // Default
+    assert_eq!(body.limit, 10); // Default
+}
+
+#[tokio::test]
+async fn test_list_users_with_page_param() {
+    let router = test_router();
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/users?page=5")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = router.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: ListUsersResponse = json_body(response.into_body()).await;
+    assert_eq!(body.page, 5);
+    assert_eq!(body.limit, 10); // Default
+}
+
+#[tokio::test]
+async fn test_list_users_with_limit_param() {
+    let router = test_router();
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/users?limit=25")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = router.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: ListUsersResponse = json_body(response.into_body()).await;
+    assert_eq!(body.page, 1); // Default
+    assert_eq!(body.limit, 25);
+}
+
+#[tokio::test]
+async fn test_list_users_with_both_params() {
+    let router = test_router();
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/users?page=3&limit=50")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = router.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: ListUsersResponse = json_body(response.into_body()).await;
+    assert_eq!(body.page, 3);
+    assert_eq!(body.limit, 50);
+}
+
+#[tokio::test]
+async fn test_list_users_with_unknown_param() {
+    let router = test_router();
+
+    // Unknown params should be ignored (serde default behavior)
+    let request = Request::builder()
+        .method("GET")
+        .uri("/users?unknown=value&page=2")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = router.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: ListUsersResponse = json_body(response.into_body()).await;
+    assert_eq!(body.page, 2);
 }

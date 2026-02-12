@@ -26,15 +26,14 @@ This macro eliminates that boilerplate.
 ## Requirements
 
 ### Supported
-- GET/POST/PUT/DELETE requests
+- GET/POST/PUT/DELETE/PATCH requests
 - JSON request and response bodies
-- Single path parameter per route
+- Path parameters (single or multiple)
+- Query parameters (as a struct with `Serialize + Deserialize`)
 
 ### Non-goals
 - Headers
-- Query parameters
 - Websockets
-- Multiple path parameters
 - Non-JSON bodies
 
 ## Desired API
@@ -58,6 +57,14 @@ impl MyServerApp {
     pub async fn get_user(&self, #[path] id: UserId) -> MyAppResult<GetUserResponse> {
         let user = todo!();
         Ok(user)
+    }
+
+    // #[query] marks the parameter as query string params
+    // ListUsersParams must impl Serialize + Deserialize
+    #[api_handler(method = "GET", path = "/users")]
+    pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyAppResult<Vec<User>> {
+        let users = todo!();
+        Ok(users)
     }
 }
 ```
@@ -84,6 +91,13 @@ async fn get_user(
 ) -> impl IntoResponse {
     state.get_user(id).await
 }
+
+async fn list_users(
+    State(state): State<Arc<MyServerApp>>,
+    Query(params): Query<ListUsersParams>,
+) -> impl IntoResponse {
+    state.list_users(params).await
+}
 ```
 
 ### Client
@@ -97,17 +111,21 @@ pub struct MyServerAppClient {
 impl MyServerAppClient {
     pub fn new(base_url: impl Into<String>) -> Self { ... }
 
-    // Private helpers: get, post, put, delete
-
-    pub async fn create_user(&self, user: CreateUserRequest) -> ClientResult<CreateUserResponse> {
-        self.post("/users", &user).await
+    pub async fn create_user(&self, user: &CreateUserRequest) -> ClientResult<CreateUserResponse> {
+        // POST to /users with JSON body
     }
 
     pub async fn get_user(&self, id: UserId) -> ClientResult<GetUserResponse> {
-        self.get(&format!("/users/{id}")).await
+        // GET /users/{id}
+    }
+
+    pub async fn list_users(&self, params: &ListUsersParams) -> ClientResult<Vec<User>> {
+        // GET /users?page=1&limit=10 (query string from params struct)
     }
 }
 ```
+
+Note: The client uses `serde_urlencoded` to serialize query parameters. Users of the generated client need `serde_urlencoded` as a dependency.
 
 ### Client Error Type
 

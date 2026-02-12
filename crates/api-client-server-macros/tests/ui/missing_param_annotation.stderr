@@ -4,4 +4,4 @@ error: custom attribute panicked
 5 | #[api]
   | ^^^^^^
   |
-  = help: message: Parameter `req` in `create_user` must be annotated with #[body] or #[path]
+  = help: message: Parameter `req` in `create_user` must be annotated with #[body], #[path], or #[query]

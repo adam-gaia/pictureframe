@@ -939,3 +939,4 @@ async fn test_upload_photo_no_file() {
     // or if the "not configured" error is returned first
     assert!(status == StatusCode::BAD_REQUEST || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
+

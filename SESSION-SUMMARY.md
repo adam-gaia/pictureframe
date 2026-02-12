@@ -1,4 +1,4 @@
-# Session Summary: SQLx + API Macro Refactor
+# Session Summary: SQLx + API Macro Refactor + Query Params
 
 ## Completed Work
 
@@ -25,68 +25,89 @@
 - Created `tests/e2e.rs` with 5 tests using real images from `./data/inbox-todo/`
 - Tests require ImageMagick and skip gracefully if unavailable
 
-### Phase 7: Frontend Integration (Complete - This Session)
+### Phase 7: Frontend Integration (Complete)
 - Fixed and updated the Leptos viewer frontend
 - Implemented full admin panel with Photos, Albums, and Settings tabs
 - Added missing client methods for admin functionality
+
+### Phase 8: Query Parameter Support (Complete)
+- Added `#[query]` attribute for query string parameters in API handlers
+- Server generates `axum::extract::Query<T>` extractor
+- Client serializes query struct to URL query string using `serde_urlencoded`
+
+### Phase 9: Admin Photo Upload (Complete - This Session)
+- Added "Upload Photo" button to the Photos tab in admin panel
+- Uses web-sys FormData and fetch API for multipart file upload
+- Shows upload progress and error messages
 
 ---
 
 ## This Session's Work
 
-### Behavior Change: Library Fallback
-When no album is selected, `/api/next` now returns photos from the entire library (ordered by ID) instead of returning an error.
+### Query Parameter Support (`crates/api-client-server-macros/`)
 
-### Frontend Viewer (`crates/frontend-viewer/`)
-- Fixed `get_next()` client method (was calling wrong endpoint, returning wrong type)
-- Updated to use server-provided interval for photo rotation
-- Added metadata overlay with fade-out animation (title, artist, date, copyright)
-- Uses trigger-based effect pattern for scheduling
+Added `#[query]` parameter support to the API macro, enabling query string parameters for endpoints.
 
-### Frontend Admin (`crates/frontend-admin/`)
-Implemented complete admin panel with three tabs:
+**Usage:**
+```rust
+#[api_handler(method = "GET", path = "/users")]
+pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyResult<Vec<User>> {
+    // params.page, params.limit, etc.
+}
+```
 
-**Photos Tab:**
-- Grid display of all photos with thumbnails
-- Delete functionality for each photo
-- Refresh button
+**Implementation:**
+- Added `ParamKind::Query` variant
+- Server: Generates `axum::extract::Query<T>` extractor
+- Client: Serializes query struct to URL query string using `serde_urlencoded`
+- Query struct must implement `Serialize + Deserialize`
 
-**Albums Tab:**
-- Create new albums
-- Sidebar list of albums with photo counts
-- Album detail view showing:
-  - Photos in album (with remove button)
-  - Available photos to add (click to add)
-- Delete album functionality
+**Tests Added:**
+- 10 new unit tests for query param parsing/generation
+- 5 new router integration tests (query params in HTTP requests)
+- 4 new client integration tests (query params serialization)
+- 1 new macro expansion test
 
-**Settings Tab:**
-- Album selector dropdown (including "All photos" option)
-- Duration presets (30s, 1m, 2m, 3m, 5m, 10m)
-- Displays current settings from server
+**Documentation:**
+- Updated AGENTS.md with query param examples and requirements
+- Updated error messages to include `#[query]` option
 
-### Common Client Updates (`crates/common/`)
-Added missing API client methods:
-- `get_photos()` - list all photos
-- `get_photo(id)` - get single photo
-- `get_albums()` - list all albums
-- `get_album(id)` - get single album
-- `create_album(req)` - create new album
-- `delete_photo(id)` - delete photo
-- `delete_album(id)` - delete album
-- `add_photo_to_album(album_id, photo_id)`
-- `remove_photo_from_album(album_id, photo_id)`
+### Admin Photo Upload (`crates/frontend-admin/`)
 
-Added `Clone` and `PartialEq` derives to types as needed for Leptos.
+Added photo upload functionality to the admin panel Photos tab.
+
+**Implementation:**
+- Hidden file input triggered by "Upload Photo" button
+- Uses web-sys `FormData` and `fetch` API for multipart upload
+- Uploads to `POST /api/photos` endpoint
+- Shows "Uploading..." state during upload
+- Displays error message on failure
+- Auto-refreshes photo list on success
+
+**Dependencies Added:**
+- `wasm-bindgen` and `wasm-bindgen-futures`
+- `web-sys` with features: File, FileList, FormData, HtmlInputElement, Request, RequestInit, Response, Window
 
 ---
 
 ## Current State
 
-**All 53 tests passing:**
+**All tests passing:**
+
+Main project (53 tests):
 ```
 tests/api.rs    - 42 tests (API integration)
 tests/client.rs -  6 tests (client library)
 tests/e2e.rs    -  5 tests (end-to-end with real images)
+```
+
+Macro crate (89 tests):
+```
+src/lib.rs      - 49 unit tests
+tests/router.rs - 21 router integration tests
+tests/client.rs - 17 client integration tests
+tests/expand.rs -  7 macro expansion tests
+tests/ui.rs     -  5 UI/error tests
 ```
 
 **Frontends compile:**
@@ -151,7 +172,5 @@ cargo check -p frontend-admin   # OK
 - Wire up `process_inbox()` for automatic photo import
 
 ### Optional Enhancements
-- Add `#[api_handler]` support for query parameters
 - Add request body validation
 - Add proper logging/tracing to handlers
-- Photo upload in admin UI (currently API-only)

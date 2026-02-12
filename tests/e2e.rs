@@ -138,14 +138,18 @@ async fn post_empty(router: axum::Router, uri: &str) -> (StatusCode, Value) {
 async fn upload_photo_file(router: axum::Router, file_path: &std::path::Path) -> (StatusCode, Value) {
     let file_bytes = std::fs::read(file_path).expect("Failed to read test image");
     let filename = file_path.file_name().unwrap().to_string_lossy();
+    upload_bytes(router, filename.as_ref(), &file_bytes).await
+}
 
+/// Helper to upload raw bytes via multipart form.
+async fn upload_bytes(router: axum::Router, filename: &str, file_bytes: &[u8]) -> (StatusCode, Value) {
     // Use the same multipart format as the working api.rs tests
     let boundary = "----TestBoundary";
     let body = format!(
-        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: image/jpeg\r\n\r\n"
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
     );
     let mut body_bytes = body.into_bytes();
-    body_bytes.extend_from_slice(&file_bytes);
+    body_bytes.extend_from_slice(file_bytes);
     body_bytes.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
 
     let request = Request::builder()
@@ -390,4 +394,71 @@ async fn test_e2e_photo_metadata_from_exif() {
     // The title should be set from the filename (without extension)
     let expected_title = images[0].file_stem().unwrap().to_string_lossy();
     assert_eq!(json["title"].as_str().unwrap(), expected_title.as_ref());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File Type Validation Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_e2e_upload_rejects_png() {
+    if !has_imagemagick() {
+        eprintln!("Skipping test: ImageMagick not available");
+        return;
+    }
+
+    let (app, _temp_dir) = create_e2e_app().await;
+    let router = create_test_router_with_extras(app);
+
+    // Try to upload a fake PNG file
+    let fake_png = b"\x89PNG\r\n\x1a\nfake png data";
+    let (status, json) = upload_bytes(router, "test.png", fake_png).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Only JPEG files are supported"));
+}
+
+#[tokio::test]
+async fn test_e2e_upload_rejects_gif() {
+    if !has_imagemagick() {
+        eprintln!("Skipping test: ImageMagick not available");
+        return;
+    }
+
+    let (app, _temp_dir) = create_e2e_app().await;
+    let router = create_test_router_with_extras(app);
+
+    // Try to upload a fake GIF file
+    let fake_gif = b"GIF89afake gif data";
+    let (status, json) = upload_bytes(router, "test.gif", fake_gif).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Only JPEG files are supported"));
+}
+
+#[tokio::test]
+async fn test_e2e_upload_rejects_webp() {
+    if !has_imagemagick() {
+        eprintln!("Skipping test: ImageMagick not available");
+        return;
+    }
+
+    let (app, _temp_dir) = create_e2e_app().await;
+    let router = create_test_router_with_extras(app);
+
+    // Try to upload a fake WebP file
+    let fake_webp = b"RIFFxxxxWEBPfake webp data";
+    let (status, json) = upload_bytes(router, "test.webp", fake_webp).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Only JPEG files are supported"));
 }

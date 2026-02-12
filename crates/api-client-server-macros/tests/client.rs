@@ -5,7 +5,7 @@
 mod common;
 
 use common::{
-    CreateUserRequest, MyServerApp, MyServerAppClient, MyServerAppClientError, UserId,
+    CreateUserRequest, ListUsersParams, MyServerApp, MyServerAppClient, MyServerAppClientError, UserId,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -247,4 +247,68 @@ async fn test_client_base_url_string_conversion() {
     client1.get_user(UserId(1)).await.expect("String should work");
     client2.get_user(UserId(1)).await.expect("&String should work");
     client3.get_user(UserId(1)).await.expect("&str should work");
+}
+
+// ── Client list_users (query params) tests ───────────────────────────────
+
+#[tokio::test]
+async fn test_client_list_users_no_params() {
+    let addr = spawn_server().await;
+    let client = MyServerAppClient::new(format!("http://{}", addr));
+
+    let params = ListUsersParams::default();
+    let result = client.list_users(&params).await;
+
+    let response = result.expect("list_users should succeed");
+    assert_eq!(response.users.len(), 2);
+    assert_eq!(response.page, 1);
+    assert_eq!(response.limit, 10);
+}
+
+#[tokio::test]
+async fn test_client_list_users_with_page() {
+    let addr = spawn_server().await;
+    let client = MyServerAppClient::new(format!("http://{}", addr));
+
+    let params = ListUsersParams {
+        page: Some(5),
+        limit: None,
+    };
+    let result = client.list_users(&params).await;
+
+    let response = result.expect("list_users should succeed");
+    assert_eq!(response.page, 5);
+    assert_eq!(response.limit, 10);
+}
+
+#[tokio::test]
+async fn test_client_list_users_with_limit() {
+    let addr = spawn_server().await;
+    let client = MyServerAppClient::new(format!("http://{}", addr));
+
+    let params = ListUsersParams {
+        page: None,
+        limit: Some(25),
+    };
+    let result = client.list_users(&params).await;
+
+    let response = result.expect("list_users should succeed");
+    assert_eq!(response.page, 1);
+    assert_eq!(response.limit, 25);
+}
+
+#[tokio::test]
+async fn test_client_list_users_with_both_params() {
+    let addr = spawn_server().await;
+    let client = MyServerAppClient::new(format!("http://{}", addr));
+
+    let params = ListUsersParams {
+        page: Some(3),
+        limit: Some(50),
+    };
+    let result = client.list_users(&params).await;
+
+    let response = result.expect("list_users should succeed");
+    assert_eq!(response.page, 3);
+    assert_eq!(response.limit, 50);
 }

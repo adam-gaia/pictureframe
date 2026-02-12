@@ -26,6 +26,7 @@ struct HandlerParam {
 enum ParamKind {
     Body,
     Path,
+    Query,
 }
 
 /// Represents a fully parsed handler method.
@@ -40,7 +41,7 @@ struct ParsedHandler {
     visibility: syn::Visibility,
 }
 
-/// Check if an attribute list contains a specific helper attribute like `#[body]` or `#[path]`.
+/// Check if an attribute list contains a specific helper attribute like `#[body]`, `#[path]`, or `#[query]`.
 fn take_param_attr(attrs: &[Attribute]) -> Option<ParamKind> {
     for attr in attrs {
         if attr.path().is_ident("body") {
@@ -49,16 +50,23 @@ fn take_param_attr(attrs: &[Attribute]) -> Option<ParamKind> {
         if attr.path().is_ident("path") {
             return Some(ParamKind::Path);
         }
+        if attr.path().is_ident("query") {
+            return Some(ParamKind::Query);
+        }
     }
     None
 }
 
-/// Strip `#[body]`, `#[path]`, and `#[api_handler(...)]` attributes so they don't
+/// Strip `#[body]`, `#[path]`, `#[query]`, and `#[api_handler(...)]` attributes so they don't
 /// confuse the compiler in the output.
 fn strip_helper_attrs(attrs: &[Attribute]) -> Vec<Attribute> {
     attrs
         .iter()
-        .filter(|a| !a.path().is_ident("body") && !a.path().is_ident("path"))
+        .filter(|a| {
+            !a.path().is_ident("body")
+                && !a.path().is_ident("path")
+                && !a.path().is_ident("query")
+        })
         .cloned()
         .collect()
 }
@@ -111,7 +119,7 @@ fn parse_handler(method: &ImplItemFn) -> Option<ParsedHandler> {
             if let Pat::Ident(pat_ident) = pat.as_ref() {
                 let kind = take_param_attr(attrs).unwrap_or_else(|| {
                     panic!(
-                        "Parameter `{}` in `{}` must be annotated with #[body] or #[path]",
+                        "Parameter `{}` in `{}` must be annotated with #[body], #[path], or #[query]",
                         pat_ident.ident, fn_name
                     )
                 });
@@ -166,7 +174,7 @@ fn generate_axum_handler(struct_name: &syn::Ident, handler: &ParsedHandler) -> T
         axum::extract::State(state): axum::extract::State<std::sync::Arc<#struct_name>>
     });
 
-    // Path params come before body
+    // Path params come before query and body
     let path_params: Vec<_> = handler
         .params
         .iter()
@@ -190,6 +198,16 @@ fn generate_axum_handler(struct_name: &syn::Ident, handler: &ParsedHandler) -> T
         for name in &names {
             call_args.push(quote! { #name });
         }
+    }
+
+    // Query params come before body
+    for param in handler.params.iter().filter(|p| p.kind == ParamKind::Query) {
+        let name = &param.name;
+        let ty = &param.ty;
+        extractor_params.push(quote! {
+            axum::extract::Query(#name): axum::extract::Query<#ty>
+        });
+        call_args.push(quote! { #name });
     }
 
     // Body param (must be last for axum)
@@ -259,6 +277,7 @@ fn generate_client(struct_name: &syn::Ident, handlers: &[ParsedHandler]) -> Toke
         let mut fn_params: Vec<TokenStream2> = Vec::new();
         let mut path_format_args: Vec<TokenStream2> = Vec::new();
         let mut body_arg: Option<TokenStream2> = None;
+        let mut query_arg: Option<TokenStream2> = None;
 
         for param in &handler.params {
             let name = &param.name;
@@ -272,15 +291,37 @@ fn generate_client(struct_name: &syn::Ident, handlers: &[ParsedHandler]) -> Toke
                     fn_params.push(quote! { #name: &#ty });
                     body_arg = Some(quote! { #name });
                 }
+                ParamKind::Query => {
+                    fn_params.push(quote! { #name: &#ty });
+                    query_arg = Some(quote! { #name });
+                }
             }
         }
 
         // Build the URL expression
         let path_str = &handler.path;
-        let url_expr = if path_format_args.is_empty() {
+        let base_url_expr = if path_format_args.is_empty() {
             quote! { format!("{}{}", self.base_url, #path_str) }
         } else {
             quote! { format!(concat!("{}", #path_str), self.base_url, #(#path_format_args),*) }
+        };
+
+        // Add query string if there's a query param
+        let url_expr = if let Some(query) = &query_arg {
+            quote! {
+                {
+                    let base = #base_url_expr;
+                    let query_string = serde_urlencoded::to_string(#query)
+                        .expect("failed to serialize query parameters");
+                    if query_string.is_empty() {
+                        base
+                    } else {
+                        format!("{}?{}", base, query_string)
+                    }
+                }
+            }
+        } else {
+            base_url_expr
         };
 
         // Build the request chain
@@ -497,6 +538,18 @@ mod tests {
         assert_eq!(take_param_attr(&attrs), None);
     }
 
+    #[test]
+    fn take_param_attr_query() {
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[query])];
+        assert_eq!(take_param_attr(&attrs), Some(ParamKind::Query));
+    }
+
+    #[test]
+    fn take_param_attr_query_with_others() {
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[doc = "some doc"]), parse_quote!(#[query])];
+        assert_eq!(take_param_attr(&attrs), Some(ParamKind::Query));
+    }
+
     // ── Tests for strip_helper_attrs() ──────────────────────────────────────
 
     #[test]
@@ -520,6 +573,27 @@ mod tests {
         let attrs: Vec<Attribute> = vec![
             parse_quote!(#[body]),
             parse_quote!(#[path]),
+            parse_quote!(#[doc = "kept"]),
+        ];
+        let stripped = strip_helper_attrs(&attrs);
+        assert_eq!(stripped.len(), 1);
+        assert!(stripped[0].path().is_ident("doc"));
+    }
+
+    #[test]
+    fn strip_helper_attrs_removes_query() {
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[query]), parse_quote!(#[doc = "kept"])];
+        let stripped = strip_helper_attrs(&attrs);
+        assert_eq!(stripped.len(), 1);
+        assert!(stripped[0].path().is_ident("doc"));
+    }
+
+    #[test]
+    fn strip_helper_attrs_removes_all_three() {
+        let attrs: Vec<Attribute> = vec![
+            parse_quote!(#[body]),
+            parse_quote!(#[path]),
+            parse_quote!(#[query]),
             parse_quote!(#[doc = "kept"]),
         ];
         let stripped = strip_helper_attrs(&attrs);
@@ -753,6 +827,42 @@ mod tests {
     }
 
     #[test]
+    fn parse_handler_get_with_query() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users")]
+            pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyAppResult<Vec<User>> {
+                todo!()
+            }
+        };
+
+        let parsed = parse_handler(&method).expect("Should parse successfully");
+        assert_eq!(parsed.fn_name.to_string(), "list_users");
+        assert_eq!(parsed.method, "GET");
+        assert_eq!(parsed.path, "/users");
+        assert_eq!(parsed.params.len(), 1);
+        assert_eq!(parsed.params[0].name.to_string(), "params");
+        assert_eq!(parsed.params[0].kind, ParamKind::Query);
+    }
+
+    #[test]
+    fn parse_handler_get_with_path_and_query() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users/{id}/posts")]
+            pub async fn list_user_posts(&self, #[path] id: UserId, #[query] params: Pagination) -> MyAppResult<Vec<Post>> {
+                todo!()
+            }
+        };
+
+        let parsed = parse_handler(&method).expect("Should parse successfully");
+        assert_eq!(parsed.fn_name.to_string(), "list_user_posts");
+        assert_eq!(parsed.params.len(), 2);
+        assert_eq!(parsed.params[0].name.to_string(), "id");
+        assert_eq!(parsed.params[0].kind, ParamKind::Path);
+        assert_eq!(parsed.params[1].name.to_string(), "params");
+        assert_eq!(parsed.params[1].kind, ParamKind::Query);
+    }
+
+    #[test]
     fn parse_handler_preserves_visibility() {
         let method: ImplItemFn = parse_quote! {
             #[api_handler(method = "GET", path = "/internal")]
@@ -853,6 +963,44 @@ mod tests {
 
         assert!(code.contains("Path"));
         assert!(code.contains("UserId"));
+    }
+
+    #[test]
+    fn generate_axum_handler_with_query_param() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users")]
+            pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyAppResult<Vec<User>> {
+                todo!()
+            }
+        };
+
+        let parsed = parse_handler(&method).unwrap();
+        let struct_name: syn::Ident = parse_quote!(MyApp);
+        let generated = generate_axum_handler(&struct_name, &parsed);
+        let code = generated.to_string();
+
+        assert!(code.contains("Query"));
+        assert!(code.contains("ListUsersParams"));
+    }
+
+    #[test]
+    fn generate_axum_handler_with_path_and_query() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users/{id}/posts")]
+            pub async fn list_user_posts(&self, #[path] id: UserId, #[query] params: Pagination) -> MyAppResult<Vec<Post>> {
+                todo!()
+            }
+        };
+
+        let parsed = parse_handler(&method).unwrap();
+        let struct_name: syn::Ident = parse_quote!(MyApp);
+        let generated = generate_axum_handler(&struct_name, &parsed);
+        let code = generated.to_string();
+
+        assert!(code.contains("Path"));
+        assert!(code.contains("UserId"));
+        assert!(code.contains("Query"));
+        assert!(code.contains("Pagination"));
     }
 
     // ── Tests for generate_router() ─────────────────────────────────────────
@@ -964,5 +1112,47 @@ mod tests {
         // Path param should be taken by value (no &)
         assert!(code.contains("id : UserId"));
         assert!(!code.contains("id : & UserId"));
+    }
+
+    #[test]
+    fn generate_client_method_with_query_takes_reference() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users")]
+            pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyAppResult<Vec<User>> {
+                todo!()
+            }
+        };
+
+        let handlers = vec![parse_handler(&method).unwrap()];
+        let struct_name: syn::Ident = parse_quote!(MyApp);
+        let generated = generate_client(&struct_name, &handlers);
+        let code = generated.to_string();
+
+        // Query param should be taken by reference
+        assert!(code.contains("params : & ListUsersParams"));
+        // Should use serde_urlencoded
+        assert!(code.contains("serde_urlencoded"));
+    }
+
+    #[test]
+    fn generate_client_method_with_path_and_query() {
+        let method: ImplItemFn = parse_quote! {
+            #[api_handler(method = "GET", path = "/users/{id}/posts")]
+            pub async fn list_user_posts(&self, #[path] id: UserId, #[query] params: Pagination) -> MyAppResult<Vec<Post>> {
+                todo!()
+            }
+        };
+
+        let handlers = vec![parse_handler(&method).unwrap()];
+        let struct_name: syn::Ident = parse_quote!(MyApp);
+        let generated = generate_client(&struct_name, &handlers);
+        let code = generated.to_string();
+
+        // Path param should be taken by value
+        assert!(code.contains("id : UserId"));
+        // Query param should be taken by reference
+        assert!(code.contains("params : & Pagination"));
+        // Should use serde_urlencoded
+        assert!(code.contains("serde_urlencoded"));
     }
 }

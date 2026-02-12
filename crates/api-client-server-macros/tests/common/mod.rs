@@ -42,6 +42,19 @@ pub struct GetUserResponse {
     pub email: String,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ListUsersParams {
+    pub page: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListUsersResponse {
+    pub users: Vec<GetUserResponse>,
+    pub page: u32,
+    pub limit: u32,
+}
+
 // ── Result type (user-defined, must impl IntoResponse) ─────────────────
 
 pub enum MyAppResult<T> {
@@ -111,6 +124,27 @@ impl MyServerApp {
     pub async fn delete_user(&self, #[path] id: UserId) -> MyAppResult<()> {
         // Your real logic here
         MyAppResult::Ok(())
+    }
+
+    #[api_handler(method = "GET", path = "/users")]
+    pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyAppResult<ListUsersResponse> {
+        // Your real logic here
+        MyAppResult::Ok(ListUsersResponse {
+            users: vec![
+                GetUserResponse {
+                    id: UserId(1),
+                    name: "Alice".to_string(),
+                    email: "alice@example.com".to_string(),
+                },
+                GetUserResponse {
+                    id: UserId(2),
+                    name: "Bob".to_string(),
+                    email: "bob@example.com".to_string(),
+                },
+            ],
+            page: params.page.unwrap_or(1),
+            limit: params.limit.unwrap_or(10),
+        })
     }
 
     // Non-annotated methods are left untouched

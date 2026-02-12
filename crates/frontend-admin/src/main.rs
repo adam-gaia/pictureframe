@@ -3,6 +3,9 @@ use common::{
     UpdateSettingsRequest,
 };
 use leptos::{prelude::*, task::spawn_local};
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{FormData, HtmlInputElement, Request, RequestInit, Response};
 
 fn main() {
     _ = console_log::init_with_level(log::Level::Debug);
@@ -153,20 +156,124 @@ fn PhotosTab<F>(photos: ReadSignal<Vec<Photo>>, client: Client, on_refresh: F) -
 where
     F: Fn() + Clone + Send + 'static,
 {
+    let (upload_status, set_upload_status) = signal(None::<String>);
+    let (upload_error, set_upload_error) = signal(None::<String>);
+    let file_input_ref = NodeRef::<leptos::html::Input>::new();
+
+    let handle_file_change = {
+        let on_refresh = on_refresh.clone();
+        move |_| {
+            let Some(input) = file_input_ref.get() else {
+                return;
+            };
+            let input: HtmlInputElement = input.into();
+            let Some(files) = input.files() else {
+                return;
+            };
+
+            let file_count = files.length();
+            if file_count == 0 {
+                return;
+            }
+
+            // Collect all files into a Vec
+            let files: Vec<web_sys::File> = (0..file_count)
+                .filter_map(|i| files.get(i))
+                .collect();
+
+            set_upload_status.set(Some(format!("Uploading 0/{}", file_count)));
+            set_upload_error.set(None);
+            let on_refresh = on_refresh.clone();
+
+            spawn_local(async move {
+                let mut errors: Vec<String> = Vec::new();
+                let total = files.len();
+
+                for (i, file) in files.into_iter().enumerate() {
+                    set_upload_status.set(Some(format!("Uploading {}/{}...", i + 1, total)));
+
+                    if let Err(e) = upload_photo(file).await {
+                        log::error!("Upload failed: {}", e);
+                        errors.push(e);
+                    }
+                }
+
+                set_upload_status.set(None);
+
+                if errors.is_empty() {
+                    on_refresh();
+                } else {
+                    // Refresh to show any that succeeded
+                    on_refresh();
+                    // Show errors
+                    let error_msg = if errors.len() == 1 {
+                        errors[0].clone()
+                    } else {
+                        format!("{} uploads failed", errors.len())
+                    };
+                    set_upload_error.set(Some(error_msg));
+                }
+
+                // Clear the input so the same files can be selected again
+                if let Some(input) = file_input_ref.get() {
+                    let input: HtmlInputElement = input.into();
+                    input.set_value("");
+                }
+            });
+        }
+    };
+
+    let trigger_upload = move |_| {
+        if let Some(input) = file_input_ref.get() {
+            let input: HtmlInputElement = input.into();
+            input.click();
+        }
+    };
+
+    let is_uploading = move || upload_status.get().is_some();
+
     view! {
         <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">"Photos (" {move || photos.get().len()} ")"</h2>
-                <button
-                    style="padding: 0.5rem 1rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;"
-                    on:click={
-                        let on_refresh = on_refresh.clone();
-                        move |_| on_refresh()
-                    }
-                >
-                    "Refresh"
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    // Hidden file input (multiple files allowed)
+                    <input
+                        type="file"
+                        accept="image/jpeg"
+                        multiple=true
+                        node_ref=file_input_ref
+                        style="display: none;"
+                        on:change=handle_file_change
+                    />
+                    // Upload button
+                    <button
+                        style="padding: 0.5rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                        on:click=trigger_upload
+                        disabled=is_uploading
+                    >
+                        {move || upload_status.get().unwrap_or_else(|| "Upload Photos".to_string())}
+                    </button>
+                    // Refresh button
+                    <button
+                        style="padding: 0.5rem 1rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                        on:click={
+                            let on_refresh = on_refresh.clone();
+                            move |_| on_refresh()
+                        }
+                        disabled=is_uploading
+                    >
+                        "Refresh"
+                    </button>
+                </div>
             </div>
+
+            // Upload error message
+            {move || upload_error.get().map(|err| view! {
+                <div style="background: #ffebee; color: #c62828; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem;">
+                    {err}
+                </div>
+            })}
 
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
                 {move || photos.get().into_iter().map(|photo| {
@@ -179,7 +286,7 @@ where
             {move || if photos.get().is_empty() {
                 Some(view! {
                     <p style="color: #666; text-align: center; padding: 2rem;">
-                        "No photos yet. Upload photos via the API."
+                        "No photos yet. Click \"Upload Photo\" to add your first photo."
                     </p>
                 })
             } else {
@@ -187,6 +294,42 @@ where
             }}
         </div>
     }
+}
+
+/// Upload a photo file to the server via multipart form data.
+async fn upload_photo(file: web_sys::File) -> Result<(), String> {
+    let form_data = FormData::new().map_err(|e| format!("Failed to create FormData: {:?}", e))?;
+    form_data
+        .append_with_blob_and_filename("file", &file, &file.name())
+        .map_err(|e| format!("Failed to append file: {:?}", e))?;
+
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_body(&form_data);
+
+    let request = Request::new_with_str_and_init("/api/photos", &opts)
+        .map_err(|e| format!("Failed to create request: {:?}", e))?;
+
+    let window = web_sys::window().ok_or("No window object")?;
+    let resp_value = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(|e| format!("Fetch failed: {:?}", e))?;
+
+    let resp: Response = resp_value
+        .dyn_into()
+        .map_err(|_| "Response is not a Response object")?;
+
+    if !resp.ok() {
+        let status = resp.status();
+        let body = JsFuture::from(resp.text().map_err(|_| "Failed to get response text")?)
+            .await
+            .map_err(|_| "Failed to read response body")?
+            .as_string()
+            .unwrap_or_default();
+        return Err(format!("Server error ({}): {}", status, body));
+    }
+
+    Ok(())
 }
 
 #[component]
