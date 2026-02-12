@@ -1,13 +1,12 @@
 use anyhow::{Result, bail};
-use chrono::{NaiveDate, NaiveDateTime};
-use image_hasher::{HasherConfig, ImageHash};
-use std::env::temp_dir;
+use chrono::NaiveDateTime;
+use image_hasher::HasherConfig;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf};
 use tokio::process::Command;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error};
 
 #[derive(Debug)]
 pub struct PhotoMetadata {
@@ -37,6 +36,7 @@ impl PhotoMetadata {
 
 #[derive(Debug)]
 pub struct OnDiskPhoto {
+    hash: String,
     metadata: PhotoMetadata,
     fullsize: PathBuf,
     websize: PathBuf,
@@ -86,21 +86,31 @@ impl OnDiskPhoto {
         make_thumbnail(magick_exec, &orig, &tmp_thumbnail).await?;
         debug!("Generated thumbnail image {}", tmp_thumbnail.display());
 
-        let fullsize = working_dir.join(format!("{hash}-fullsize.{orig_ext}"));
-        fs::rename(orig, &fullsize)?;
+        let fullsize_name = format!("{hash}-fullsize.{orig_ext}");
+        let fullsize_tmp = working_dir.join(&fullsize_name);
+        fs::rename(orig, &fullsize_tmp)?;
 
-        let websize = working_dir.join(&websize_name);
-        let thumbnail = working_dir.join(&thumbnail_name);
+        // Move the entire working directory to the final output location
+        // TODO: this fails if we've previously processed the photo. We need to use the hash to check the database before we get this far. Should be done before generating thumbs too
+        let outdir = photos_dir.join(&hash);
+        fs::rename(working_dir, &outdir)?;
 
-        let outdir = photos_dir.join(hash);
-        fs::rename(working_dir, outdir)?;
+        // The paths now point to the new location after the rename
+        let fullsize = outdir.join(&fullsize_name);
+        let websize = outdir.join(&websize_name);
+        let thumbnail = outdir.join(&thumbnail_name);
 
         Ok(Self {
+            hash,
             metadata,
             fullsize,
             websize,
             thumbnail,
         })
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.hash
     }
 
     pub fn metadata(&self) -> &PhotoMetadata {

@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, Attribute, FnArg, ImplItem, ImplItemFn, ItemImpl, Pat, PatType,
-    ReturnType, Type,
+    parse_macro_input, Attribute, FnArg, ImplItem, ImplItemFn, ItemImpl, Pat, PatType, ReturnType,
+    Type,
 };
 
 /// Parsed representation of `#[api_handler(method = "POST", path = "/users/{id}")]`
@@ -487,10 +487,7 @@ mod tests {
 
     #[test]
     fn take_param_attr_path_with_others() {
-        let attrs: Vec<Attribute> = vec![
-            parse_quote!(#[doc = "some doc"]),
-            parse_quote!(#[path]),
-        ];
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[doc = "some doc"]), parse_quote!(#[path])];
         assert_eq!(take_param_attr(&attrs), Some(ParamKind::Path));
     }
 
@@ -504,10 +501,7 @@ mod tests {
 
     #[test]
     fn strip_helper_attrs_removes_body() {
-        let attrs: Vec<Attribute> = vec![
-            parse_quote!(#[body]),
-            parse_quote!(#[doc = "kept"]),
-        ];
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[body]), parse_quote!(#[doc = "kept"])];
         let stripped = strip_helper_attrs(&attrs);
         assert_eq!(stripped.len(), 1);
         assert!(stripped[0].path().is_ident("doc"));
@@ -515,10 +509,7 @@ mod tests {
 
     #[test]
     fn strip_helper_attrs_removes_path() {
-        let attrs: Vec<Attribute> = vec![
-            parse_quote!(#[path]),
-            parse_quote!(#[allow(unused)]),
-        ];
+        let attrs: Vec<Attribute> = vec![parse_quote!(#[path]), parse_quote!(#[allow(unused)])];
         let stripped = strip_helper_attrs(&attrs);
         assert_eq!(stripped.len(), 1);
         assert!(stripped[0].path().is_ident("allow"));
@@ -773,7 +764,10 @@ mod tests {
         let parsed = parse_handler(&method).expect("Should parse successfully");
         // Check visibility is preserved (pub(crate))
         let vis_str = quote!(#(parsed.visibility)).to_string();
-        assert!(vis_str.contains("crate") || matches!(parsed.visibility, syn::Visibility::Restricted(_)));
+        assert!(
+            vis_str.contains("crate")
+                || matches!(parsed.visibility, syn::Visibility::Restricted(_))
+        );
     }
 
     #[test]

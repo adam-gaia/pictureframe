@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Upload a photo to the API
+# Usage: ./upload-photo <photo_path> [server_url]
+
+PHOTO_PATH="${1:?Error: Please provide a photo path as the first argument}"
+SERVER_URL="${2:-http://localhost:3000}"
+
+curl -X POST "${SERVER_URL}/api/photos" \
+  -F "file=@${PHOTO_PATH}" \
+  -H "Accept: application/json"

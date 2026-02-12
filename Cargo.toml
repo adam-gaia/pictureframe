@@ -7,11 +7,10 @@ edition = "2024"
 members = [".", "crates/*"]
 
 [dependencies]
+api-macros = {path = "./crates/api-client-server-macros"}
 common = {path = "./crates/common"}
-migration = {path = "./crates/migration"}
-entity = {path = "./crates/entity"}
 anyhow = "1.0.101"
-axum = { version = "0.8.8", features = ["macros"] }
+axum = { version = "0.8.8", features = ["macros", "multipart"] }
 directories = "6.0.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -20,7 +19,7 @@ serde_json = "1.0.149"
 tokio = { version = "1.49.0", features = ["full"] }
 ts-rs = { version = "12.0.1", features = ["chrono", "chrono-impl", "serde-compat"] }
 clap = { version = "4.5.57", features = ["derive"] }
-sea-orm = { version = "1.1.19", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-json", "with-chrono", "with-uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
 which = "8.0.0"
 image = { version = "0.25.9", features = ["jpeg"] }
 image_hasher = "3.1.0"
@@ -32,3 +31,9 @@ axum-extra = "0.12.5"
 tower-service = "0.3.3"
 console_log = "1.0.0"
 log = "0.4.29"
+reqwest = { version = "0.13.2", features = ["json"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

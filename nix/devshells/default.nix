@@ -41,7 +41,7 @@ in
         vale
         mdbook
         trunk
-        sea-orm-cli
+        sqlx-cli
       ]
       # Include the extra packages we use to build our crate
       ++ commonArgs.buildInputs

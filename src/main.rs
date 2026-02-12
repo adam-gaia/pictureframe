@@ -1,20 +1,17 @@
-use crate::api::{
-    albums::get_albums,
-    photos::{get_next_photo, get_photos},
-};
 use anyhow::{Result, bail};
-use axum::{Json, Router, http::StatusCode, response::Html, routing::get};
+use axum::{
+    Json, Router,
+    extract::{DefaultBodyLimit, Multipart, Path, State},
+    http::StatusCode,
+    routing::{get, post},
+};
 use clap::Parser;
 use directories::ProjectDirs;
+use pictureframe::App;
 use std::{env, fs, path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
-
-mod app;
-use app::App;
-mod api;
-mod on_disk_photo;
 
 const THIS_CRATE_NAME: &'static str = env!("CARGO_PKG_NAME");
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -45,6 +42,22 @@ impl HealthResponse {
 
 async fn health() -> (StatusCode, Json<HealthResponse>) {
     (StatusCode::OK, Json(HealthResponse::new()))
+}
+
+/// Handler for serving image files.
+async fn serve_image(
+    State(state): State<Arc<App>>,
+    Path(id): Path<i32>,
+) -> axum::response::Response {
+    state.serve_image(id).await
+}
+
+/// Handler for uploading photos via multipart form.
+async fn upload_photo(
+    State(state): State<Arc<App>>,
+    multipart: Multipart,
+) -> axum::response::Response {
+    state.upload_photo(multipart).await
 }
 
 #[derive(Debug, Parser)]
@@ -85,33 +98,42 @@ async fn main() -> Result<()> {
     }
 
     let app = App::new(data_dir.to_path_buf()).await?;
-    app.process_inbox().await?;
+    // TODO: renable
+    // app.process_inbox().await?;
 
     let state = Arc::new(app);
 
-    let api_photos_router = Router::new()
-        .route("/next", get(get_next_photo))
-        .route("/", get(get_photos));
-    let api_albums_router = Router::new().route("/", get(get_albums));
-    let api_router = Router::new()
-        .nest("/photos", api_photos_router)
-        .nest("/albums", api_albums_router);
+    // let api_photos_router = Router::new()
+    // .route("/next", get(get_next_photo))
+    // .route("/", get(get_photos));
+    // let api_albums_router = Router::new().route("/", get(get_albums));
+    // let api_router = Router::new()
+    // .nest("/photos", api_photos_router)
+    // .nest("/albums", api_albums_router);
 
     let admin_dist = dist_dir.join("admin");
-    let index_file = admin_dist.join("index.html");
-    let admin_spa = ServeDir::new(&admin_dist).not_found_service(ServeFile::new(index_file));
+    let admin_index = admin_dist.join("index.html");
+    let admin_spa = ServeDir::new(&admin_dist).not_found_service(ServeFile::new(&admin_index));
 
     let viewer_dist = dist_dir.join("viewer");
-    let index_file = viewer_dist.join("index.html");
-    let viewer_spa = ServeDir::new(&viewer_dist).not_found_service(ServeFile::new(index_file));
+    let viewer_index = viewer_dist.join("index.html");
+    let viewer_spa = ServeDir::new(&viewer_dist).not_found_service(ServeFile::new(&viewer_index));
+
+    let api_router = state.clone().router();
+
+    // Routes for binary/multipart data (not part of the macro-generated router)
+    let extra_routes = Router::new()
+        .route("/api/images/{id}", get(serve_image))
+        .route("/api/photos", post(upload_photo))
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024)) // 50MB limit for uploads
+        .with_state(state);
 
     let app = Router::new()
         .route("/_health", get(health))
-        .nest("/api", api_router)
-        .nest_service("/images", images_service)
+        .merge(api_router)
+        .merge(extra_routes)
         .nest_service("/admin", admin_spa)
-        .fallback_service(viewer_spa)
-        .with_state(state);
+        .fallback_service(viewer_spa);
 
     let listener = TcpListener::bind("127.0.0.1:3000").await?;
     info!("Serving on http://127.0.0.1:3000");

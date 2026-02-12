@@ -11,16 +11,6 @@ use common::{AlbumID, Next, Photo, PhotoID, UpdatePhotoRequest, UploadPhotoReque
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub fn db_photo_to_photo(input: entity::photo::Model) -> Photo {
-    Photo {
-        title: input.title,
-        notes: input.notes,
-        artist: input.artist,
-        copyright: input.copyright,
-        date_taken: input.date_taken,
-    }
-}
-
 pub async fn get_next_photo(State(state): State<Arc<App>>) -> Json<Next> {
     let photo = state.get_next_photo().await.map(db_photo_to_photo).unwrap(); // TODO: handle and return http 5xx or whatever instead of unwrap
     let interval = state.get_interval().await;
