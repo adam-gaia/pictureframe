@@ -48,8 +48,12 @@ impl OnDiskPhoto {
         let orig_name = orig.file_stem().unwrap().to_string_lossy().to_string();
         let orig_ext = orig.extension().unwrap().to_string_lossy();
 
+        debug!("\n\ncheck 1\n\n");
+
         // TODO: the hash and parse_exif functions both open the photo file and can probably be optimized to do it once
         let hash = hash_photo(&orig)?;
+
+        debug!("\n\ncheck 2\n\n");
 
         // Create a tmp working dir to work in.
         // If there are any errors, the tmp dir will be removed so we aren't left in a partial state.
@@ -66,6 +70,8 @@ impl OnDiskPhoto {
         }
         fs::create_dir_all(&working_dir)?;
 
+        debug!("\n\ncheck 3\n\n");
+
         let title = orig_name;
         let (artist, copyright, date_taken) = parse_exif(orig)?;
         let metadata = PhotoMetadata {
@@ -76,15 +82,21 @@ impl OnDiskPhoto {
         };
         debug!("metadata: {metadata:?}");
 
+        debug!("\n\ncheck 4\n\n");
+
         let websize_name = format!("{hash}-websize.{orig_ext}");
         let tmp_websize = working_dir.join(&websize_name);
         make_websize(magick_exec, &orig, &tmp_websize).await?;
         debug!("Generated websize image {}", tmp_websize.display());
 
+        debug!("\n\ncheck 5\n\n");
+
         let thumbnail_name = format!("{hash}-thumbnail.{orig_ext}");
         let tmp_thumbnail = working_dir.join(&thumbnail_name);
         make_thumbnail(magick_exec, &orig, &tmp_thumbnail).await?;
         debug!("Generated thumbnail image {}", tmp_thumbnail.display());
+
+        debug!("\n\ncheck 6\n\n");
 
         let fullsize_name = format!("{hash}-fullsize.{orig_ext}");
         let fullsize_tmp = working_dir.join(&fullsize_name);
@@ -94,6 +106,8 @@ impl OnDiskPhoto {
         // fs::rename(orig, &fullsize_tmp)?;
         fs::copy(&orig, &fullsize_tmp)?;
         fs::remove_file(&orig)?;
+
+        debug!("\n\ncheck 7\n\n");
 
         // TODO: can we add a clippy lint to block the usage of fs::rename()?
 
@@ -105,10 +119,14 @@ impl OnDiskPhoto {
         fs_extra::dir::copy(&working_dir, &outdir, &opts)?;
         // working_dir will get deleted on drop
 
+        debug!("\n\ncheck 8\n\n");
+
         // The paths now point to the new location after the rename
         let fullsize = outdir.join(&fullsize_name);
         let websize = outdir.join(&websize_name);
         let thumbnail = outdir.join(&thumbnail_name);
+
+        debug!("\n\ncheck 9\n\n");
 
         Ok(Self {
             hash,
