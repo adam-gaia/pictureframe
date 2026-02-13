@@ -34,22 +34,25 @@ in {
     users.groups.${cfg.user} = {};
 
     # Cage kiosk compositor running Firefox
-    services.cage = let
+    services.cage =
+      # let
       # Remove .mozilla to stop crash message
-      firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
-        rm -rf ~/.mozilla
-        exec "${pkgs.firefox}/bin/firefox" --kiosk --private-window ${cfg.url}
-      '';
-    in {
-      enable = true;
-      user = cfg.user;
-      program = "${firefox-kiosk}/bin/firefox-kiosk";
-      environment = {
-        # Needed so cage doesnt block without input devices
-        # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
-        WLR_LIBINPUT_NO_DEVICES = "1";
+      # firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
+      #   rm -rf ~/.mozilla
+      #   exec "${pkgs.firefox}/bin/firefox" --kiosk ${cfg.url}
+      #   # '--private-window ' causes crash??
+      # '';
+      # in
+      {
+        enable = true;
+        user = cfg.user;
+        program = "${pkgs.chromium} --kiosk --no-first-run --start-maximized --enable-features=OverlayScrollbar --noerrdialogs --disable-infobars ${cfg.url}"; #"${firefox-kiosk}/bin/firefox-kiosk";
+        environment = {
+          # Needed so cage doesnt block without input devices
+          # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
+          WLR_LIBINPUT_NO_DEVICES = "1";
+        };
       };
-    };
 
     environment.sessionVariables = {
       # Ensure Firefox uses Wayland natively under Cage
