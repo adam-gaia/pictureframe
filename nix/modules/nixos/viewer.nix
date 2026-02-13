@@ -4,9 +4,9 @@
   pkgs,
   ...
 }: let
-  cfg = config.services.pictureframe;
+  cfg = config.services.pictureframeViewer;
 in {
-  options.services.pictureframe = {
+  options.services.pictureframeViewer = {
     enable = lib.mkEnableOption "pictureframe kiosk display";
 
     url = lib.mkOption {
