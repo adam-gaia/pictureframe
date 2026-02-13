@@ -29,6 +29,8 @@
       fileset = lib.fileset.unions [
         # Default files from crane (Rust and cargo files)
         (craneLib.fileset.commonCargoSources unfilteredRoot)
+        # Also keep sql migrations
+        (lib.fileset.maybeMissing (unfilteredRoot + "/migrations"))
         # Also keep any markdown files (for trycmd)
         (lib.fileset.fileFilter (file: file.hasExt "md") unfilteredRoot)
         # Test files (for trycmd)
