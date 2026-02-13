@@ -38,7 +38,7 @@ in {
       # Remove .mozilla to stop crash message
       firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
         rm -rf ~/.mozilla
-        exec "${pkgs.firefox}/bin/firefox" --kiosk --private-window --safe-mode ${cfg.url}
+        exec "${pkgs.firefox}/bin/firefox" --safe-mode ${cfg.url}
       '';
     in {
       enable = true;
