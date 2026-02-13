@@ -37,8 +37,10 @@ in {
     services.cage = let
       # Remove .mozilla to stop crash message
       firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
-        rm -rf ~/.mozilla ~/.cache/mozilla
-        exec "${pkgs.firefox}/bin/firefox" --safe-mode ${cfg.url}
+        rm -rf /home/${cfg.user}/.mozilla
+        rm -rf /home/${cfg.user}/.config/mozilla
+        rm -rf /home/${cfg.user}/.cache/mozilla
+        exec "${pkgs.firefox}/bin/firefox" --new-instance --profile  --safe-mode ${cfg.url}
       '';
     in {
       enable = true;
