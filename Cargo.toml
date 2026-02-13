@@ -14,8 +14,8 @@ include = ["src/**/*", "LICENSE-*", "README.md"]
 members = [".", "crates/*"]
 
 [dependencies]
-api-macros = {path = "./crates/api-client-server-macros"}
-common = {path = "./crates/common"}
+api-macros = {version = "0.1.0", path = "./crates/api-client-server-macros"}
+pictureframe-common = {version = "0.1.0", path = "./crates/common"}
 anyhow = "1.0.101"
 axum = { version = "0.8.8", features = ["macros", "multipart"] }
 directories = "6.0.0"

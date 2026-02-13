@@ -673,19 +673,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "log",
- "reqwasm",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "compression-codecs"
 version = "0.4.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1274,28 +1261,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "frontend-admin"
-version = "0.1.0"
-dependencies = [
- "common",
- "console_error_panic_hook",
- "console_log",
- "leptos",
- "log",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "frontend-viewer"
 version = "0.1.0"
 dependencies = [
- "common",
  "console_error_panic_hook",
  "console_log",
  "leptos",
  "log",
+ "pictureframe-common",
 ]
 
 [[package]]
@@ -2700,7 +2673,6 @@ dependencies = [
  "axum-extra",
  "chrono",
  "clap",
- "common",
  "console_log",
  "directories",
  "http-body-util",
@@ -2708,6 +2680,7 @@ dependencies = [
  "image_hasher",
  "kamadak-exif",
  "log",
+ "pictureframe-common",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -2722,6 +2695,33 @@ dependencies = [
  "tracing-subscriber",
  "ts-rs",
  "which",
+]
+
+[[package]]
+name = "pictureframe-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "log",
+ "reqwasm",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "pictureframe-frontend-admin"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "leptos",
+ "log",
+ "pictureframe-common",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

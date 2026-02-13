@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 use api_macros::api;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use common::{
+use pictureframe_common::{
     Album, AlbumID, CreateAlbumRequest, CurrentAlbum, Interval, Next, Photo, PhotoID,
     RotationSettings, Update, UpdateAlbumRequest, UpdatePhotoRequest, UpdateSettingsRequest,
 };

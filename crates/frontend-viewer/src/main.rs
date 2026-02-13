@@ -1,5 +1,5 @@
-use common::{Client, Next, Photo};
 use leptos::{prelude::*, task::spawn_local};
+use pictureframe_common::{Client, Next, Photo};
 use std::time::Duration;
 
 fn main() {

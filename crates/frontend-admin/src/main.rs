@@ -1,8 +1,8 @@
-use common::{
+use leptos::{prelude::*, task::spawn_local};
+use pictureframe_common::{
     Album, AlbumID, Client, CreateAlbumRequest, Photo, RotationSettings, Update,
     UpdateSettingsRequest,
 };
-use leptos::{prelude::*, task::spawn_local};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{FormData, HtmlInputElement, Request, RequestInit, Response};
@@ -177,9 +177,7 @@ where
             }
 
             // Collect all files into a Vec
-            let files: Vec<web_sys::File> = (0..file_count)
-                .filter_map(|i| files.get(i))
-                .collect();
+            let files: Vec<web_sys::File> = (0..file_count).filter_map(|i| files.get(i)).collect();
 
             set_upload_status.set(Some(format!("Uploading 0/{}", file_count)));
             set_upload_error.set(None);
@@ -416,10 +414,7 @@ where
             let on_refresh = on_refresh.clone();
             spawn_local(async move {
                 match client
-                    .create_album(&CreateAlbumRequest {
-                        name,
-                        notes: None,
-                    })
+                    .create_album(&CreateAlbumRequest { name, notes: None })
                     .await
                 {
                     Ok(_) => {

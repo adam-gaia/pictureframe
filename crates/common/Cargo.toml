@@ -1,7 +1,14 @@
 [package]
-name = "common"
+name = "pictureframe-common"
 version = "0.1.0"
 edition = "2024"
+description = "Code shared between components of pictureframe"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/adam-gaia/pictureframe"
+repository = "https://github.com/adam-gaia/pictureframe"
+authors = ["Adam Gaia <git@agaia.dev>"]
+include = ["src/**/*", "LICENSE-*", "README.md"]
+
 
 [dependencies]
 anyhow = "1.0.101"
