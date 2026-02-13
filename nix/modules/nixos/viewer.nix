@@ -48,4 +48,9 @@ in {
     # GPU / graphics support for the Pi
     hardware.graphics.enable = true;
   };
+
+  systemd.services."cage-tty1".after = [
+    "network-online.target"
+    "systemd-resolved.service"
+  ];
 }
