@@ -37,7 +37,7 @@ in {
     services.cage = let
       # Remove .mozilla to stop crash message
       firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
-        rm -rf ~/.mozilla
+        rm -rf ~/.mozilla ~/.cache/mozilla
         exec "${pkgs.firefox}/bin/firefox" --safe-mode ${cfg.url}
       '';
     in {
