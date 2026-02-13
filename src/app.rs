@@ -12,7 +12,7 @@ use serde::Serialize;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::path::Path;
 use std::{fs, path::PathBuf};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 const DB_FILE_NAME: &str = "db.sqlite";
 
@@ -201,7 +201,11 @@ impl App {
 
         let interval = Interval::from(settings.interval_seconds);
         let mat_style = MatStyle::from_preset(&photo.mat_preset);
-        APIResult::Ok(Next { photo, interval, mat_style })
+        APIResult::Ok(Next {
+            photo,
+            interval,
+            mat_style,
+        })
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -958,6 +962,7 @@ impl App {
         let photo = match OnDiskPhoto::import(&temp_path, photos_dir, magick_exec).await {
             Ok(p) => p,
             Err(e) => {
+                error!("{e}");
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("Content-Type", "application/json")
