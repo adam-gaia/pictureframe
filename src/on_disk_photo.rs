@@ -93,7 +93,7 @@ impl OnDiskPhoto {
         // https://stackoverflow.com/a/24210631
         // fs::rename(orig, &fullsize_tmp)?;
         fs::copy(&orig, &fullsize_tmp)?;
-        fs::remove_dir_all(&orig)?;
+        fs::remove_file(&orig)?;
 
         // TODO: can we add a clippy lint to block the usage of fs::rename()?
 
