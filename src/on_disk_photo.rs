@@ -88,12 +88,24 @@ impl OnDiskPhoto {
 
         let fullsize_name = format!("{hash}-fullsize.{orig_ext}");
         let fullsize_tmp = working_dir.join(&fullsize_name);
-        fs::rename(orig, &fullsize_tmp)?;
+        // Note: fs::rename fails when /tmp and data dir are on different filesystems so we use copy+remove instead
+        // This was triggered when running pictureframe under systemd
+        // https://stackoverflow.com/a/24210631
+        // fs::rename(orig, &fullsize_tmp)?;
+        fs::copy(&orig, &fullsize_tmp)?;
+        fs::remove_dir_all(&orig)?;
+
+        // TODO: can we add a clippy lint to block the usage of fs::rename()?
 
         // Move the entire working directory to the final output location
         // TODO: this fails if we've previously processed the photo. We need to use the hash to check the database before we get this far. Should be done before generating thumbs too
         let outdir = photos_dir.join(&hash);
-        fs::rename(working_dir, &outdir)?;
+        // Note: fs::rename fails when /tmp and data dir are on different filesystems so we use copy+remove instead
+        // This was triggered when running pictureframe under systemd
+        // https://stackoverflow.com/a/24210631
+        // fs::rename(working_dir, &outdir)?;
+        fs::copy(&working_dir, &outdir)?;
+        fs::remove_dir_all(&working_dir)?;
 
         // The paths now point to the new location after the rename
         let fullsize = outdir.join(&fullsize_name);
