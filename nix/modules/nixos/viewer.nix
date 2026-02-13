@@ -5,6 +5,19 @@
   ...
 }: let
   cfg = config.services.pictureframeViewer;
+
+  mkUserHome = username: "/var/lib/${username}"; # TODO: make this match config.users.users.${cfg.user}.home
+
+  # Remove .mozilla to stop crash message
+  mk-firefox-kiosk = username: let
+    userHome = mkUserHome username;
+  in
+    pkgs.writeShellScriptBin "firefox-kiosk" ''
+      rm -rf ${userHome}/.mozilla
+      rm -rf ${userHome}/.cache/mozilla
+
+      exec "${pkgs.firefox}/bin/firefox" --new-instance --kiosk ${cfg.url} #--new-instance --safe-mode ${cfg.url}
+    '';
 in {
   options.services.pictureframeViewer = {
     enable = lib.mkEnableOption "pictureframe kiosk display";
@@ -33,22 +46,27 @@ in {
     };
     users.groups.${cfg.user} = {};
 
+    programs.firefox = let
+      firefox-package = mk-firefox-kiosk cfg.user;
+    in {
+      enable = true;
+      package = firefox-package;
+      policies = {
+        DisableTelemetry = true;
+        DisableFirefoxStudies = true;
+        DisableFirefoxAccounts = true;
+        DisableAccounts = true;
+        DontCheckDefaultBrowser = true;
+      };
+    };
+
     # Cage kiosk compositor running Firefox
     services.cage = let
-      userHome = "/var/lib/${cfg.user}"; # TODO: make this match config.users.users.${cfg.user}.home
-
-      # Remove .mozilla to stop crash message
-      firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
-        rm -rf ${userHome}/.mozilla
-        rm -rf ${userHome}/.config/mozilla
-        rm -rf ${userHome}/.cache/mozilla
-
-        exec "${pkgs.firefox}/bin/firefox" --new-instance --kiosk ${cfg.url} #--new-instance --safe-mode ${cfg.url}
-      '';
+      firefox-package = mk-firefox-kiosk cfg.user;
     in {
       enable = true;
       user = cfg.user;
-      program = "${firefox-kiosk}/bin/firefox-kiosk";
+      program = "${firefox-package}/bin/firefox-kiosk";
       environment = {
         # Needed so cage doesnt block without input devices
         # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
