@@ -1,5 +1,5 @@
 [package]
-name = "frontend-viewer"
+name = "pictureframe-frontend-viewer"
 version = "0.1.0"
 edition = "2024"
 description = "Pictureframe's main webapp for viewing rotating images"

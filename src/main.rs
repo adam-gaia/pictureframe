@@ -62,7 +62,7 @@ async fn upload_photo(
 
 #[derive(Debug, Parser)]
 struct Cli {
-    /// Data directory. Defaults to ${XDG_DATA_HOME}/frame
+    /// Data directory. Defaults to ${XDG_DATA_HOME}/pictureframe
     #[clap(long)]
     data_dir: Option<PathBuf>,
 

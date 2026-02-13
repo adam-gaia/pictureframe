@@ -29,8 +29,14 @@
       fileset = lib.fileset.unions [
         # Default files from crane (Rust and cargo files)
         (craneLib.fileset.commonCargoSources unfilteredRoot)
-        # Also keep sql migrations
+        # Keep sql migrations
         (lib.fileset.maybeMissing (unfilteredRoot + "/migrations"))
+        # Keep wasm app files
+        (lib.fileset.fileFilter (
+            file:
+              lib.any file.hasExt ["html" "css" "scss"]
+          )
+          unfilteredRoot)
         # Also keep any markdown files (for trycmd)
         (lib.fileset.fileFilter (file: file.hasExt "md") unfilteredRoot)
         # Test files (for trycmd)

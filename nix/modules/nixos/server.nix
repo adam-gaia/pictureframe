@@ -50,7 +50,7 @@ in {
         };
 
       serviceConfig = {
-        ExecStart = lib.getExe cfg.package;
+        ExecStart = "${lib.getExe cfg.package} --dist-dir ${flake.packages.${pkgs.system}.frontend}";
         Restart = "on-failure";
         RestartSec = 5;
 
