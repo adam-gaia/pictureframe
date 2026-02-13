@@ -42,7 +42,9 @@ in {
         rm -rf ${userHome}/.mozilla
         rm -rf ${userHome}/.config/mozilla
         rm -rf ${userHome}/.cache/mozilla
-        exec "${pkgs.firefox}/bin/firefox" ${cfg.url} #--new-instance --safe-mode ${cfg.url}
+
+        # TODO: --kiosk, --safe-mode, --new-instance all crash firefox
+        exec "${pkgs.firefox}/bin/firefox" --kiosk ${cfg.url} #--new-instance --safe-mode ${cfg.url}
       '';
     in {
       enable = true;
