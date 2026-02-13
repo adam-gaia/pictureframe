@@ -86,6 +86,8 @@ impl OnDiskPhoto {
         make_thumbnail(magick_exec, &orig, &tmp_thumbnail).await?;
         debug!("Generated thumbnail image {}", tmp_thumbnail.display());
 
+        debug!("\n\ncheck 1\n\n");
+
         let fullsize_name = format!("{hash}-fullsize.{orig_ext}");
         let fullsize_tmp = working_dir.join(&fullsize_name);
         // Note: fs::rename fails when /tmp and data dir are on different filesystems so we use copy+remove instead
@@ -93,19 +95,24 @@ impl OnDiskPhoto {
         // https://stackoverflow.com/a/24210631
         // fs::rename(orig, &fullsize_tmp)?;
         fs::copy(&orig, &fullsize_tmp)?;
+
+        debug!("\n\ncheck 2\n\n");
+
         fs::remove_file(&orig)?;
+
+        debug!("\n\ncheck 3\n\n");
 
         // TODO: can we add a clippy lint to block the usage of fs::rename()?
 
         // Move the entire working directory to the final output location
         // TODO: this fails if we've previously processed the photo. We need to use the hash to check the database before we get this far. Should be done before generating thumbs too
         let outdir = photos_dir.join(&hash);
-        // Note: fs::rename fails when /tmp and data dir are on different filesystems so we use copy+remove instead
-        // This was triggered when running pictureframe under systemd
-        // https://stackoverflow.com/a/24210631
-        // fs::rename(working_dir, &outdir)?;
-        fs::copy(&working_dir, &outdir)?;
-        fs::remove_dir_all(&working_dir)?;
+        let mut opts = fs_extra::dir::CopyOptions::new();
+        opts.copy_inside = true;
+        fs_extra::dir::copy(&working_dir, &outdir, &opts)?;
+        // working_dir will get deleted on drop
+
+        debug!("\n\ncheck 4\n\n");
 
         // The paths now point to the new location after the rename
         let fullsize = outdir.join(&fullsize_name);

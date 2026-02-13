@@ -2664,6 +2664,7 @@ dependencies = [
  "clap",
  "console_log",
  "directories",
+ "fs_extra",
  "http-body-util",
  "image",
  "image_hasher",
