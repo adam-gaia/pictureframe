@@ -35,13 +35,13 @@ in {
 
     # Cage kiosk compositor running Firefox
     services.cage = let
-      home = cfg.users.users.${cfg.user}.home;
+      userHome = "/var/lib/${cfg.user}"; # TODO: make this match config.users.users.${cfg.user}.home
 
       # Remove .mozilla to stop crash message
       firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
-        rm -rf ${home}/.mozilla
-        rm -rf ${home}/.config/mozilla
-        rm -rf ${home}/.cache/mozilla
+        rm -rf ${userHome}/.mozilla
+        rm -rf ${userHome}/.config/mozilla
+        rm -rf ${userHome}/.cache/mozilla
         exec "${pkgs.firefox}/bin/firefox" --new-instance --safe-mode ${cfg.url}
       '';
     in {
