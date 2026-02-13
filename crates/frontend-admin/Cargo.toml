@@ -11,7 +11,7 @@ include = ["src/**/*", "LICENSE-*", "README.md"]
 
 
 [dependencies]
-pictureframe-common = {path = "../common"}
+pictureframe-common = {version = "0.1.0", path = "../common"}
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
 leptos = { version = "0.8.15", features = ["csr"] }
