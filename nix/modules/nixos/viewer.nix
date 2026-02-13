@@ -34,10 +34,15 @@ in {
     users.groups.${cfg.user} = {};
 
     # Cage kiosk compositor running Firefox
-    services.cage = {
+    services.cage = let
+      firefox-kiosk = pkgs.writeShellScriptBin "firefox-kiosk" ''
+        rm -rf ~/.mozilla
+        exec "${pkgs.firefox}/bin/firefox" --kiosk --private-window ${cfg.url}
+      '';
+    in {
       enable = true;
       user = cfg.user;
-      program = "${pkgs.firefox}/bin/firefox --kiosk --private-window ${cfg.url}";
+      program = "${firefox-kiosk}/bin/firefox-kiosk";
       environment = {
         # Needed so cage doesnt block without input devices
         # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
