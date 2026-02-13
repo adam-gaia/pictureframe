@@ -73,7 +73,13 @@ impl OnDiskPhoto {
         debug!("\n\ncheck 3\n\n");
 
         let title = orig_name;
-        let (artist, copyright, date_taken) = parse_exif(orig)?;
+        let (artist, copyright, date_taken) = match parse_exif(orig) {
+            Ok(fields) => fields,
+            Err(e) => {
+                error!("unable to process metadata: {e}");
+                (None, None, None)
+            }
+        };
         let metadata = PhotoMetadata {
             title,
             artist,
