@@ -40,7 +40,7 @@ in {
         rm -rf /home/${cfg.user}/.mozilla
         rm -rf /home/${cfg.user}/.config/mozilla
         rm -rf /home/${cfg.user}/.cache/mozilla
-        exec "${pkgs.firefox}/bin/firefox" --new-instance --profile  --safe-mode ${cfg.url}
+        exec "${pkgs.firefox}/bin/firefox" --new-instance --safe-mode ${cfg.url}
       '';
     in {
       enable = true;
