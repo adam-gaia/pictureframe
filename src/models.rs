@@ -15,6 +15,7 @@ pub struct DbPhoto {
     pub fullsize_path: String,
     pub websize_path: String,
     pub thumbnail_path: String,
+    pub mat_preset: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }

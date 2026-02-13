@@ -1,7 +1,7 @@
 use leptos::{prelude::*, task::spawn_local};
 use pictureframe_common::{
-    Album, AlbumID, Client, CreateAlbumRequest, Photo, RotationSettings, Update,
-    UpdateSettingsRequest,
+    Album, AlbumID, Client, CreateAlbumRequest, MatStyle, Photo, RotationSettings, Update,
+    UpdatePhotoRequest, UpdateSettingsRequest,
 };
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
@@ -330,16 +330,106 @@ async fn upload_photo(file: web_sys::File) -> Result<(), String> {
     Ok(())
 }
 
+/// Visual preview of a mat style - shows a small square with the mat's background color,
+/// padding effect, and shadow
+#[component]
+fn MatPreview(preset_name: &'static str, size: u32) -> impl IntoView {
+    let style = MatStyle::from_preset(preset_name);
+
+    // Calculate padding ratio (convert vmin to approximate pixels for preview)
+    let padding_px = match style.padding.as_str() {
+        "5vmin" => (size as f32 * 0.15) as u32,
+        "4vmin" => (size as f32 * 0.12) as u32,
+        "3vmin" => (size as f32 * 0.09) as u32,
+        "2vmin" => (size as f32 * 0.06) as u32,
+        _ => 0,
+    };
+
+    let outer_style = format!(
+        "width: {}px; height: {}px; background: {}; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: {}px; border-radius: 3px;{}",
+        size,
+        size,
+        style.background_color,
+        padding_px,
+        style.shadow.as_ref().map(|s| format!(" box-shadow: {};", s)).unwrap_or_default()
+    );
+
+    // Inner "photo" placeholder with a gradient
+    let inner_style = "width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 2px;";
+
+    view! {
+        <div style=outer_style>
+            <div style=inner_style></div>
+        </div>
+    }
+}
+
+/// Visual picker for mat presets - displays clickable preview cards
+#[component]
+fn MatPresetPicker<F>(
+    current_preset: String,
+    on_change: F,
+    disabled: Signal<bool>,
+) -> impl IntoView
+where
+    F: Fn(String) + Clone + 'static,
+{
+    view! {
+        <div style="margin-top: 0.5rem;">
+            <label style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 0.5rem;">
+                "Mat Style"
+            </label>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                {MatStyle::preset_names().iter().map(|preset_name| {
+                    let preset = *preset_name;
+                    let is_selected = current_preset == preset;
+                    let on_change = on_change.clone();
+
+                    let card_style = if is_selected {
+                        "cursor: pointer; border: 2px solid #2196F3; border-radius: 6px; padding: 3px; background: #e3f2fd;"
+                    } else {
+                        "cursor: pointer; border: 2px solid #e0e0e0; border-radius: 6px; padding: 3px; background: white;"
+                    };
+
+                    view! {
+                        <div
+                            style=card_style
+                            on:click={
+                                let on_change = on_change.clone();
+                                move |_| {
+                                    if !disabled.get() {
+                                        on_change(preset.to_string())
+                                    }
+                                }
+                            }
+                            title=preset
+                        >
+                            <MatPreview preset_name=preset size=36 />
+                        </div>
+                    }
+                }).collect::<Vec<_>>()}
+            </div>
+            // Show current preset name below
+            <div style="font-size: 0.7rem; color: #666; margin-top: 4px; text-transform: capitalize;">
+                {current_preset}
+            </div>
+        </div>
+    }
+}
+
 #[component]
 fn PhotoCard<F>(photo: Photo, client: Client, on_delete: F) -> impl IntoView
 where
     F: Fn() + Clone + Send + 'static,
 {
     let photo_id = photo.id;
+    let current_preset = photo.mat_preset.clone();
     let (deleting, set_deleting) = signal(false);
+    let (updating_mat, set_updating_mat) = signal(false);
 
     let handle_delete = {
         let client = client.clone();
+        let on_delete = on_delete.clone();
         move |_| {
             if deleting.get() {
                 return;
@@ -357,13 +447,51 @@ where
         }
     };
 
+    let handle_mat_change = {
+        let client = client.clone();
+        let on_refresh = on_delete.clone();
+        move |preset: String| {
+            if updating_mat.get() {
+                return;
+            }
+            set_updating_mat.set(true);
+            let client = client.clone();
+            let on_refresh = on_refresh.clone();
+            spawn_local(async move {
+                let updates = UpdatePhotoRequest {
+                    title: None,
+                    artist: None,
+                    copyright: None,
+                    date_taken: None,
+                    mat_preset: Some(preset),
+                };
+                match client.update_photo(photo_id, &updates).await {
+                    Ok(_) => on_refresh(),
+                    Err(e) => log::error!("Failed to update mat preset: {:?}", e),
+                }
+                set_updating_mat.set(false);
+            });
+        }
+    };
+
+    // Get mat style for the thumbnail preview
+    let mat_style = MatStyle::from_preset(&photo.mat_preset);
+    let thumbnail_container_style = format!(
+        "background: {}; padding: 8px;{}",
+        mat_style.background_color,
+        mat_style.shadow.as_ref().map(|s| format!(" box-shadow: {};", s)).unwrap_or_default()
+    );
+
     view! {
         <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white;">
-            <img
-                src=photo.url.clone()
-                style="width: 100%; height: 150px; object-fit: cover;"
-                loading="lazy"
-            />
+            // Photo thumbnail with mat preview effect
+            <div style=thumbnail_container_style>
+                <img
+                    src=photo.url.clone()
+                    style="width: 100%; height: 134px; object-fit: cover; display: block;"
+                    loading="lazy"
+                />
+            </div>
             <div style="padding: 0.75rem;">
                 <div style="font-weight: 500; margin-bottom: 0.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     {photo.title.clone().unwrap_or_else(|| format!("Photo {}", photo.id.0))}
@@ -371,6 +499,14 @@ where
                 {photo.artist.map(|a| view! {
                     <div style="font-size: 0.85rem; color: #666;">{a}</div>
                 })}
+
+                // Visual mat preset picker
+                <MatPresetPicker
+                    current_preset=current_preset
+                    on_change=handle_mat_change
+                    disabled=Signal::derive(move || updating_mat.get())
+                />
+
                 <button
                     style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;"
                     on:click=handle_delete

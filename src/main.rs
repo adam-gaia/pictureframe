@@ -69,6 +69,14 @@ struct Cli {
     /// Directory containing frontend assets. Defaults to ./dist
     #[clap(long)]
     dist_dir: Option<PathBuf>,
+
+    /// Host address to bind to
+    #[clap(long, default_value = "0.0.0.0")]
+    host: String,
+
+    /// Port to listen on
+    #[clap(long, default_value = "3000")]
+    port: u16,
 }
 
 #[tokio::main]
@@ -135,8 +143,8 @@ async fn main() -> Result<()> {
         .nest_service("/admin", admin_spa)
         .fallback_service(viewer_spa);
 
-    let addr = "0.0.0.0:3000";
-    let listener = TcpListener::bind(addr).await?;
+    let addr = format!("{}:{}", args.host, args.port);
+    let listener = TcpListener::bind(&addr).await?;
     info!("Serving on http://{addr}");
     axum::serve(listener, app).await?;
 

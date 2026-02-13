@@ -86,31 +86,31 @@ fn App() -> impl IntoView {
     });
 
     view! {
-        <div style="
-            width: 100vw;
-            height: 100vh;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: black;
-            position: relative;
-        ">
-            {move || current.get().map(|next| {
-                let photo = next.photo.clone();
-                let url = next.photo.url.clone();
-                view! {
-                    <img
-                        src=url
-                        style="
-                            width: 100%;
-                            height: 100%;
-                            object-fit: contain;
-                            display: block;
-                        "
-                    />
-                    <PhotoOverlay photo=photo visible=overlay_visible />
-                }
-            })}
-        </div>
+        <style>"html, body { margin: 0; padding: 0; overflow: hidden; }"</style>
+        {move || current.get().map(|next| {
+            let photo = next.photo.clone();
+            let url = next.photo.url.clone();
+            let mat = next.mat_style.clone();
+
+            // Build dynamic style for outer container
+            let outer_style = format!(
+                "width: 100vw; height: 100vh; box-sizing: border-box; padding: {}; overflow: hidden; background: {};{}",
+                mat.padding,
+                mat.background_color,
+                mat.shadow.as_ref().map(|s| format!(" box-shadow: {};", s)).unwrap_or_default()
+            );
+
+            view! {
+                <div style=outer_style>
+                    <div style="width: 100%; height: 100%; position: relative; overflow: hidden;">
+                        <img
+                            src=url
+                            style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                        />
+                        <PhotoOverlay photo=photo visible=overlay_visible />
+                    </div>
+                </div>
+            }
+        })}
     }
 }

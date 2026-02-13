@@ -7,10 +7,11 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use common::{AlbumID, CreateAlbumRequest, Update, UpdateAlbumRequest, UpdatePhotoRequest, UpdateSettingsRequest};
+use pictureframe_common::{AlbumID, CreateAlbumRequest, Update, UpdateAlbumRequest, UpdatePhotoRequest, UpdateSettingsRequest};
 use http_body_util::BodyExt;
 use pictureframe::test_helpers::{
-    create_test_app, create_test_router_with_extras, seed_album, seed_album_photo, seed_photo, set_current_album,
+    create_test_app, create_test_router_with_extras, seed_album, seed_album_photo, seed_photo,
+    seed_photo_with_mat, set_current_album,
 };
 use serde_json::Value;
 use tower::ServiceExt;
@@ -627,6 +628,7 @@ async fn test_update_photo_title() {
         artist: None,
         copyright: None,
         date_taken: None,
+        mat_preset: None,
     };
 
     let router = app.clone().router();
@@ -651,6 +653,7 @@ async fn test_update_photo_remove_title() {
         artist: None,
         copyright: None,
         date_taken: None,
+        mat_preset: None,
     };
 
     let router = app.clone().router();
@@ -672,6 +675,7 @@ async fn test_update_photo_not_found() {
         artist: None,
         copyright: None,
         date_taken: None,
+        mat_preset: None,
     };
 
     let router = app.router();
@@ -869,6 +873,231 @@ async fn test_remove_photo_not_in_album() {
     let router = app.router();
     let (status, _) = delete(router, &format!("/api/albums/{}/photos/{}", album_id, photo_id)).await;
     assert_eq!(status, StatusCode::OK);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mat Presets Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_get_mat_presets_returns_all_presets() {
+    let app = create_test_app().await;
+    let router = app.router();
+
+    let (status, json) = get_json(router, "/api/mat-presets").await;
+
+    assert_eq!(status, StatusCode::OK);
+    let presets = json.as_array().expect("response should be an array");
+    assert_eq!(presets.len(), 6);
+
+    let names: Vec<&str> = presets
+        .iter()
+        .map(|p| p["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"classic"));
+    assert!(names.contains(&"modern"));
+    assert!(names.contains(&"gallery"));
+    assert!(names.contains(&"minimal"));
+    assert!(names.contains(&"rich"));
+    assert!(names.contains(&"none"));
+}
+
+#[tokio::test]
+async fn test_mat_presets_have_required_fields() {
+    let app = create_test_app().await;
+    let router = app.router();
+
+    let (status, json) = get_json(router, "/api/mat-presets").await;
+
+    assert_eq!(status, StatusCode::OK);
+    let presets = json.as_array().expect("response should be an array");
+
+    for preset in presets {
+        assert!(preset["name"].is_string(), "name should be a string");
+        assert!(
+            preset["background_color"].is_string(),
+            "background_color should be a string"
+        );
+        assert!(preset["padding"].is_string(), "padding should be a string");
+        // shadow and inner_border can be null or string
+    }
+}
+
+#[tokio::test]
+async fn test_photo_has_default_mat_preset() {
+    let app = create_test_app().await;
+    let photo_id = seed_photo(&app, "hash1", "Test Photo").await;
+
+    let router = app.router();
+    let (status, json) = get_json(router, &format!("/api/photos/{}", photo_id)).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["mat_preset"], "classic");
+}
+
+#[tokio::test]
+async fn test_photo_with_custom_mat_preset() {
+    let app = create_test_app().await;
+    let photo_id = seed_photo_with_mat(&app, "hash1", "Test Photo", "gallery").await;
+
+    let router = app.router();
+    let (status, json) = get_json(router, &format!("/api/photos/{}", photo_id)).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["mat_preset"], "gallery");
+}
+
+#[tokio::test]
+async fn test_update_photo_mat_preset() {
+    let app = create_test_app().await;
+    let photo_id = seed_photo(&app, "hash1", "Test Photo").await;
+
+    // Update mat preset to "modern"
+    let update = UpdatePhotoRequest {
+        title: None,
+        artist: None,
+        copyright: None,
+        date_taken: None,
+        mat_preset: Some("modern".to_string()),
+    };
+    let router = app.clone().router();
+    let (status, _) = put_json(router, &format!("/api/photos/{}", photo_id), &update).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Verify the update persisted
+    let router = app.router();
+    let (status, json) = get_json(router, &format!("/api/photos/{}", photo_id)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["mat_preset"], "modern");
+}
+
+#[tokio::test]
+async fn test_update_photo_mat_preset_all_presets() {
+    let app = create_test_app().await;
+    let photo_id = seed_photo(&app, "hash1", "Test Photo").await;
+
+    for preset in ["classic", "modern", "gallery", "minimal", "rich", "none"] {
+        let update = UpdatePhotoRequest {
+            title: None,
+            artist: None,
+            copyright: None,
+            date_taken: None,
+            mat_preset: Some(preset.to_string()),
+        };
+        let router = app.clone().router();
+        let (status, _) = put_json(router, &format!("/api/photos/{}", photo_id), &update).await;
+        assert_eq!(status, StatusCode::OK, "Should accept preset '{}'", preset);
+
+        // Verify update
+        let router = app.clone().router();
+        let (_, json) = get_json(router, &format!("/api/photos/{}", photo_id)).await;
+        assert_eq!(json["mat_preset"], preset);
+    }
+}
+
+#[tokio::test]
+async fn test_update_photo_invalid_mat_preset_fails() {
+    let app = create_test_app().await;
+    let photo_id = seed_photo(&app, "hash1", "Test Photo").await;
+
+    let update = UpdatePhotoRequest {
+        title: None,
+        artist: None,
+        copyright: None,
+        date_taken: None,
+        mat_preset: Some("invalid_preset".to_string()),
+    };
+    let router = app.router();
+    let (status, json) = put_json(router, &format!("/api/photos/{}", photo_id), &update).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Unknown mat preset"));
+}
+
+#[tokio::test]
+async fn test_next_photo_includes_mat_style() {
+    let app = create_test_app().await;
+    seed_photo(&app, "hash1", "Test Photo").await;
+
+    let router = app.router();
+    let (status, json) = get_json(router, "/api/next").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["mat_style"].is_object(), "mat_style should be an object");
+    assert_eq!(json["mat_style"]["name"], "classic");
+    assert_eq!(json["mat_style"]["background_color"], "#f5f2eb");
+    assert_eq!(json["mat_style"]["padding"], "4vmin");
+}
+
+#[tokio::test]
+async fn test_next_photo_mat_style_matches_preset() {
+    let app = create_test_app().await;
+    seed_photo_with_mat(&app, "hash1", "Test Photo", "modern").await;
+
+    let router = app.router();
+    let (status, json) = get_json(router, "/api/next").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["mat_style"]["name"], "modern");
+    assert_eq!(json["mat_style"]["background_color"], "#ffffff");
+    assert!(json["mat_style"]["shadow"].is_string(), "modern preset has shadow");
+}
+
+#[tokio::test]
+async fn test_next_photo_mat_style_for_each_preset() {
+    let presets_with_shadow = vec!["modern", "rich"];
+
+    for preset in ["classic", "modern", "gallery", "minimal", "rich", "none"] {
+        let app = create_test_app().await;
+        seed_photo_with_mat(&app, "hash1", "Test Photo", preset).await;
+
+        let router = app.router();
+        let (status, json) = get_json(router, "/api/next").await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["mat_style"]["name"], preset,
+            "mat_style name should match preset"
+        );
+        assert!(
+            json["mat_style"]["background_color"].is_string(),
+            "should have background_color"
+        );
+        assert!(
+            json["mat_style"]["padding"].is_string(),
+            "should have padding"
+        );
+
+        if presets_with_shadow.contains(&preset) {
+            assert!(
+                json["mat_style"]["shadow"].is_string(),
+                "preset '{}' should have shadow",
+                preset
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_photos_list_includes_mat_preset() {
+    let app = create_test_app().await;
+    seed_photo(&app, "hash1", "Photo 1").await;
+    seed_photo_with_mat(&app, "hash2", "Photo 2", "gallery").await;
+
+    let router = app.router();
+    let (status, json) = get_json(router, "/api/photos").await;
+
+    assert_eq!(status, StatusCode::OK);
+    let photos = json.as_array().expect("response should be an array");
+    assert_eq!(photos.len(), 2);
+
+    // Each photo should have mat_preset
+    for photo in photos {
+        assert!(photo["mat_preset"].is_string());
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

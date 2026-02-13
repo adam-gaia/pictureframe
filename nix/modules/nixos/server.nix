@@ -6,6 +6,11 @@
   ...
 }: let
   cfg = config.services.pictureframeServer;
+  cliArgs = lib.cli.toGNUCommandLine {} {
+    dist-dir = cfg.distDir;
+    host = cfg.host;
+    port = cfg.port;
+  };
 in {
   options.services.pictureframeServer = {
     enable = lib.mkEnableOption "pictureframe web server";
@@ -27,6 +32,18 @@ in {
       type = lib.types.bool;
       default = false;
       description = "Enable debug logging via RUST_LOG=debug.";
+    };
+
+    host = lib.mkOption {
+      type = lib.types.str;
+      default = "0.0.0.0";
+      description = "Host address to bind to.";
+    };
+
+    port = lib.mkOption {
+      type = lib.types.port;
+      default = 3000;
+      description = "Port to listen on.";
     };
   };
 
@@ -61,7 +78,9 @@ in {
         };
 
       serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} --dist-dir ${cfg.distDir}"; # TODO: same issue with flake input from ${flake.packages.${pkgs.system}.frontend}";
+        ExecStart = lib.escapeShellArgs ([
+          (lib.getExe cfg.package)
+        ] ++ cliArgs); # TODO: same issue with flake input from ${flake.packages.${pkgs.system}.frontend}"
         Restart = "on-failure";
         RestartSec = 5;
 

@@ -44,6 +44,26 @@ pub async fn seed_photo(app: &App, hash: &str, title: &str) -> i32 {
     result
 }
 
+/// Insert a test photo with a specific mat preset.
+/// Returns the photo ID.
+pub async fn seed_photo_with_mat(app: &App, hash: &str, title: &str, mat_preset: &str) -> i32 {
+    let result = sqlx::query_scalar::<_, i32>(
+        r#"
+        INSERT INTO photo (hash, title, fullsize_path, websize_path, thumbnail_path, mat_preset)
+        VALUES (?, ?, '/test/full.jpg', '/test/web.jpg', '/test/thumb.jpg', ?)
+        RETURNING id
+        "#,
+    )
+    .bind(hash)
+    .bind(title)
+    .bind(mat_preset)
+    .fetch_one(app.pool())
+    .await
+    .expect("Failed to insert test photo");
+
+    result
+}
+
 /// Insert a test album into the database.
 /// Returns the album ID.
 pub async fn seed_album(app: &App, name: &str) -> i32 {

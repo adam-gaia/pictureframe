@@ -5,7 +5,7 @@ use api_macros::api;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use pictureframe_common::{
-    Album, AlbumID, CreateAlbumRequest, CurrentAlbum, Interval, Next, Photo, PhotoID,
+    Album, AlbumID, CreateAlbumRequest, CurrentAlbum, Interval, MatStyle, Next, Photo, PhotoID,
     RotationSettings, Update, UpdateAlbumRequest, UpdatePhotoRequest, UpdateSettingsRequest,
 };
 use serde::Serialize;
@@ -32,6 +32,7 @@ fn db_photo_to_photo(input: &DbPhoto) -> Photo {
         artist: input.artist.clone(),
         copyright: input.copyright.clone(),
         date_taken: input.date_taken,
+        mat_preset: input.mat_preset.clone(),
     }
 }
 
@@ -199,7 +200,8 @@ impl App {
             .await;
 
         let interval = Interval::from(settings.interval_seconds);
-        APIResult::Ok(Next { photo, interval })
+        let mat_style = MatStyle::from_preset(&photo.mat_preset);
+        APIResult::Ok(Next { photo, interval, mat_style })
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -349,6 +351,24 @@ impl App {
                         return APIResult::InternalError(format!("Failed to update photo: {}", e));
                     }
                 }
+            }
+        }
+
+        // Update mat_preset if provided
+        if let Some(preset) = &req.mat_preset {
+            // Validate preset exists
+            if !MatStyle::preset_names().contains(&preset.as_str()) {
+                return APIResult::InternalError(format!("Unknown mat preset: {}", preset));
+            }
+            if let Err(e) = sqlx::query(
+                "UPDATE photo SET mat_preset = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            )
+            .bind(preset)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            {
+                return APIResult::InternalError(format!("Failed to update photo: {}", e));
             }
         }
 
@@ -712,6 +732,19 @@ impl App {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Mat Presets
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[api_handler(method = "GET", path = "/api/mat-presets")]
+    pub async fn get_mat_presets(&self) -> APIResult<Vec<MatStyle>> {
+        let presets = MatStyle::preset_names()
+            .iter()
+            .map(|name| MatStyle::from_preset(name))
+            .collect();
+        APIResult::Ok(presets)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Settings
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -966,6 +999,7 @@ impl App {
                     artist: metadata.artist().cloned(),
                     copyright: metadata.copyright().cloned(),
                     date_taken: metadata.date_taken().cloned(),
+                    mat_preset: "classic".to_string(),
                 };
 
                 let json = serde_json::to_string(&response_photo).unwrap();

@@ -15,6 +15,7 @@ pkgs.testers.nixosTest {
 
     services.pictureframeServer = {
       enable = true;
+      # TODO: once we figure out the missing flake argument thing we can use default values for package and distDir
       package = flake.packages.${pkgs.system}.default;
       distDir = flake.packages.${pkgs.system}.frontend;
     };

@@ -1,176 +1,70 @@
-# Session Summary: SQLx + API Macro Refactor + Query Params
+# Session Summary: Mat Presets Feature Implementation
 
-## Completed Work
+## Current Status: Phase 2 Complete
 
-### Phase 1: SQLx Migration (Complete)
-- Replaced SeaORM with SQLx for database access
-- Created `migrations/` directory with 4 SQL migration files
-- Created `src/models.rs` with `FromRow` database models
+## Phase 1: Core Implementation (Complete)
+All 11 steps implemented - mat presets feature working.
 
-### Phase 2 & 3: API Handlers (Complete)
-- Implemented all CRUD endpoints for photos, albums, and settings
-- Implemented `/api/next` for photo rotation
+## Phase 2: Tests & Preview (Complete)
 
-### Phase 4: Test Suite (Complete)
-- Created test infrastructure with comprehensive coverage
-- 42 API integration tests
-- 6 client tests
+### Part A: Tests (Complete)
 
-### Phase 5: Photo Upload (Complete)
-- Implemented `POST /api/photos` with multipart form handling
-- Added `multipart` feature to axum
-- Validates JPEG files, processes via ImageMagick, extracts EXIF metadata
+| Step | Description | Status |
+|------|-------------|--------|
+| A1 | MatStyle unit tests in common crate | Done (13 tests) |
+| A2 | seed_photo_with_mat helper added | Done |
+| A3 | Mat presets API tests | Done (11 tests) |
+| A4 | Full test suite verification | Done (80 tests pass) |
 
-### Phase 6: End-to-End Tests (Complete)
-- Created `tests/e2e.rs` with 5 tests using real images from `./data/inbox-todo/`
-- Tests require ImageMagick and skip gracefully if unavailable
+**Test Summary:**
+- 13 unit tests for MatStyle (serialization, presets, defaults)
+- 11 API integration tests for mat presets (CRUD, validation, /api/next)
+- Fixed broken test imports (`common` → `pictureframe_common`)
+- Updated existing tests with new `mat_preset` field
 
-### Phase 7: Frontend Integration (Complete)
-- Fixed and updated the Leptos viewer frontend
-- Implemented full admin panel with Photos, Albums, and Settings tabs
-- Added missing client methods for admin functionality
+### Part B: Mat Preview (Complete)
 
-### Phase 8: Query Parameter Support (Complete)
-- Added `#[query]` attribute for query string parameters in API handlers
-- Server generates `axum::extract::Query<T>` extractor
-- Client serializes query struct to URL query string using `serde_urlencoded`
+| Step | Description | Status |
+|------|-------------|--------|
+| B1 | Create MatPreview component | Done |
+| B2 | Create MatPresetPicker component | Done |
+| B3 | Update PhotoCard to use picker | Done |
+| B4 | Live preview on thumbnails | Done |
 
-### Phase 9: Admin Photo Upload (Complete - This Session)
-- Added "Upload Photo" button to the Photos tab in admin panel
-- Uses web-sys FormData and fetch API for multipart file upload
-- Shows upload progress and error messages
+**Preview Features:**
+- `MatPreview` - Renders a visual preview square showing mat color, padding ratio, and shadow
+- `MatPresetPicker` - Grid of clickable preview cards replacing the dropdown
+- Photo thumbnails now show the mat effect (background color + shadow)
+- Visual selection indicator (blue border) on current preset
+- Preset name displayed below picker
 
----
+## Files Changed This Session
 
-## This Session's Work
+### Phase 2 Part A (Tests)
+| File | Change |
+|------|--------|
+| `crates/common/src/lib.rs` | Added #[cfg(test)] module with 13 MatStyle tests |
+| `src/test_helpers.rs` | Added `seed_photo_with_mat()` helper |
+| `tests/api.rs` | Added 11 mat preset tests, fixed imports, updated UpdatePhotoRequest |
+| `tests/e2e.rs` | Fixed import path |
+| `Cargo.toml` | Added pictureframe-common to dev-dependencies |
 
-### Query Parameter Support (`crates/api-client-server-macros/`)
+### Phase 2 Part B (Preview)
+| File | Change |
+|------|--------|
+| `crates/frontend-admin/src/main.rs` | Added MatPreview, MatPresetPicker components; updated PhotoCard |
 
-Added `#[query]` parameter support to the API macro, enabling query string parameters for endpoints.
+## Build Status
+- All crates compile successfully
+- 80 tests pass (53 API + 6 client + 8 e2e + 13 unit)
 
-**Usage:**
-```rust
-#[api_handler(method = "GET", path = "/users")]
-pub async fn list_users(&self, #[query] params: ListUsersParams) -> MyResult<Vec<User>> {
-    // params.page, params.limit, etc.
-}
-```
-
-**Implementation:**
-- Added `ParamKind::Query` variant
-- Server: Generates `axum::extract::Query<T>` extractor
-- Client: Serializes query struct to URL query string using `serde_urlencoded`
-- Query struct must implement `Serialize + Deserialize`
-
-**Tests Added:**
-- 10 new unit tests for query param parsing/generation
-- 5 new router integration tests (query params in HTTP requests)
-- 4 new client integration tests (query params serialization)
-- 1 new macro expansion test
-
-**Documentation:**
-- Updated AGENTS.md with query param examples and requirements
-- Updated error messages to include `#[query]` option
-
-### Admin Photo Upload (`crates/frontend-admin/`)
-
-Added photo upload functionality to the admin panel Photos tab.
-
-**Implementation:**
-- Hidden file input triggered by "Upload Photo" button
-- Uses web-sys `FormData` and `fetch` API for multipart upload
-- Uploads to `POST /api/photos` endpoint
-- Shows "Uploading..." state during upload
-- Displays error message on failure
-- Auto-refreshes photo list on success
-
-**Dependencies Added:**
-- `wasm-bindgen` and `wasm-bindgen-futures`
-- `web-sys` with features: File, FileList, FormData, HtmlInputElement, Request, RequestInit, Response, Window
-
----
-
-## Current State
-
-**All tests passing:**
-
-Main project (53 tests):
-```
-tests/api.rs    - 42 tests (API integration)
-tests/client.rs -  6 tests (client library)
-tests/e2e.rs    -  5 tests (end-to-end with real images)
-```
-
-Macro crate (89 tests):
-```
-src/lib.rs      - 49 unit tests
-tests/router.rs - 21 router integration tests
-tests/client.rs - 17 client integration tests
-tests/expand.rs -  7 macro expansion tests
-tests/ui.rs     -  5 UI/error tests
-```
-
-**Frontends compile:**
-```bash
-cargo check -p frontend-viewer  # OK
-cargo check -p frontend-admin   # OK
-```
-
----
-
-## All Implemented Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/next` | Get next photo (from album or entire library) |
-| GET | `/api/photos` | List all photos |
-| GET | `/api/photos/{id}` | Get single photo |
-| POST | `/api/photos` | Upload new photo (multipart form) |
-| PUT | `/api/photos/{id}` | Update photo metadata |
-| DELETE | `/api/photos/{id}` | Delete photo |
-| GET | `/api/albums` | List all albums |
-| GET | `/api/albums/{id}` | Get single album with photo IDs |
-| POST | `/api/albums` | Create album |
-| PUT | `/api/albums/{id}` | Update album |
-| DELETE | `/api/albums/{id}` | Delete album |
-| POST | `/api/albums/{album_id}/photos/{photo_id}` | Add photo to album |
-| DELETE | `/api/albums/{album_id}/photos/{photo_id}` | Remove photo from album |
-| GET | `/api/settings` | Get rotation settings |
-| PUT | `/api/settings` | Update settings (select album, change interval) |
-| GET | `/api/images/{id}` | Serve actual image file (binary response) |
-
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `src/app.rs` | App struct, API handlers, database queries |
-| `src/models.rs` | SQLx database models |
-| `src/test_helpers.rs` | Test utilities (in-memory DB, seeding, router with extras) |
-| `src/main.rs` | Server setup, static file serving, extra routes |
-| `src/on_disk_photo.rs` | Photo import/processing with ImageMagick |
-| `crates/common/src/lib.rs` | Shared types and API client |
-| `crates/frontend-viewer/src/main.rs` | Leptos viewer app |
-| `crates/frontend-admin/src/main.rs` | Leptos admin panel |
-| `migrations/*.sql` | Database schema |
-| `tests/api.rs` | API integration tests (42 tests) |
-| `tests/client.rs` | Client tests (6 tests) |
-| `tests/e2e.rs` | End-to-end tests with real images (5 tests) |
-
----
-
-## What's Left To Do
-
-### Build & Deploy
-- Build WASM frontends with trunk
-- Configure static file serving for WASM bundles
-- Test full end-to-end in browser
-
-### Production Hardening
-- Add body size limit configuration to production server (currently only test router has 50MB limit)
-- Wire up `process_inbox()` for automatic photo import
-
-### Optional Enhancements
-- Add request body validation
-- Add proper logging/tracing to handlers
+## Testing the Preview Feature
+1. Build and run the application
+2. Navigate to admin panel → Photos tab
+3. Each photo card should show:
+   - Thumbnail with mat effect (background color around image)
+   - Visual mat preset picker with 6 clickable preview squares
+   - Blue border on currently selected preset
+   - Preset name below the picker
+4. Click a different preset to change the mat style
+5. The thumbnail should update to reflect the new mat style after refresh

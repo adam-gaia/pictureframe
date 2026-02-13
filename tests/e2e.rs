@@ -7,7 +7,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use common::{AlbumID, CreateAlbumRequest, Update, UpdateSettingsRequest};
+use pictureframe_common::{AlbumID, CreateAlbumRequest, Update, UpdateSettingsRequest};
 use http_body_util::BodyExt;
 use pictureframe::App;
 use pictureframe::test_helpers::create_test_router_with_extras;

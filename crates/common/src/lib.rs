@@ -8,6 +8,72 @@ use thiserror::Error;
 /// Three minutes in seconds
 const THREE_MINS: u32 = 3 * 60;
 
+/// Visual style configuration for a mat (picture frame border)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatStyle {
+    pub name: String,
+    pub background_color: String,
+    pub padding: String,
+    pub shadow: Option<String>,
+    pub inner_border: Option<String>,
+}
+
+impl MatStyle {
+    /// Get the mat style for a given preset name
+    pub fn from_preset(name: &str) -> Self {
+        match name {
+            "modern" => Self {
+                name: "modern".into(),
+                background_color: "#ffffff".into(),
+                padding: "3vmin".into(),
+                shadow: Some("0 4px 20px rgba(0,0,0,0.15)".into()),
+                inner_border: None,
+            },
+            "gallery" => Self {
+                name: "gallery".into(),
+                background_color: "#2c2c2c".into(),
+                padding: "5vmin".into(),
+                shadow: None,
+                inner_border: None,
+            },
+            "minimal" => Self {
+                name: "minimal".into(),
+                background_color: "#f8f8f8".into(),
+                padding: "2vmin".into(),
+                shadow: None,
+                inner_border: None,
+            },
+            "rich" => Self {
+                name: "rich".into(),
+                background_color: "#3a2a1a".into(),
+                padding: "4vmin".into(),
+                shadow: Some("inset 0 0 30px rgba(0,0,0,0.3)".into()),
+                inner_border: None,
+            },
+            "none" => Self {
+                name: "none".into(),
+                background_color: "transparent".into(),
+                padding: "0".into(),
+                shadow: None,
+                inner_border: None,
+            },
+            // Default: classic
+            _ => Self {
+                name: "classic".into(),
+                background_color: "#f5f2eb".into(),
+                padding: "4vmin".into(),
+                shadow: None,
+                inner_border: None,
+            },
+        }
+    }
+
+    /// Get list of all available preset names
+    pub fn preset_names() -> &'static [&'static str] {
+        &["classic", "modern", "gallery", "minimal", "rich", "none"]
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum ApiError {
     #[error("Network error: {0}")]
@@ -71,6 +137,7 @@ pub struct UpdatePhotoRequest {
     pub artist: Option<Update<String>>,
     pub copyright: Option<Update<String>>,
     pub date_taken: Option<Update<NaiveDateTime>>,
+    pub mat_preset: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,6 +171,7 @@ pub struct Photo {
     pub artist: Option<String>,
     pub copyright: Option<String>,
     pub date_taken: Option<NaiveDateTime>,
+    pub mat_preset: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -141,6 +209,7 @@ impl From<i32> for Interval {
 pub struct Next {
     pub photo: Photo,
     pub interval: Interval,
+    pub mat_style: MatStyle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -381,5 +450,121 @@ impl Client {
 
     pub async fn update_settings(&self, updates: &UpdateSettingsRequest) -> Result<(), ApiError> {
         self.put("/api/settings", updates).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mat_style_from_preset_classic() {
+        let style = MatStyle::from_preset("classic");
+        assert_eq!(style.name, "classic");
+        assert_eq!(style.background_color, "#f5f2eb");
+        assert_eq!(style.padding, "4vmin");
+        assert!(style.shadow.is_none());
+        assert!(style.inner_border.is_none());
+    }
+
+    #[test]
+    fn test_mat_style_from_preset_modern_has_shadow() {
+        let style = MatStyle::from_preset("modern");
+        assert_eq!(style.name, "modern");
+        assert_eq!(style.background_color, "#ffffff");
+        assert_eq!(style.padding, "3vmin");
+        assert!(style.shadow.is_some());
+        assert!(style.shadow.unwrap().contains("rgba"));
+    }
+
+    #[test]
+    fn test_mat_style_from_preset_gallery() {
+        let style = MatStyle::from_preset("gallery");
+        assert_eq!(style.name, "gallery");
+        assert_eq!(style.background_color, "#2c2c2c");
+        assert_eq!(style.padding, "5vmin");
+        assert!(style.shadow.is_none());
+    }
+
+    #[test]
+    fn test_mat_style_from_preset_minimal() {
+        let style = MatStyle::from_preset("minimal");
+        assert_eq!(style.name, "minimal");
+        assert_eq!(style.background_color, "#f8f8f8");
+        assert_eq!(style.padding, "2vmin");
+    }
+
+    #[test]
+    fn test_mat_style_from_preset_rich_has_inset_shadow() {
+        let style = MatStyle::from_preset("rich");
+        assert_eq!(style.name, "rich");
+        assert_eq!(style.background_color, "#3a2a1a");
+        assert!(style.shadow.is_some());
+        assert!(style.shadow.unwrap().contains("inset"));
+    }
+
+    #[test]
+    fn test_mat_style_from_preset_none() {
+        let style = MatStyle::from_preset("none");
+        assert_eq!(style.name, "none");
+        assert_eq!(style.background_color, "transparent");
+        assert_eq!(style.padding, "0");
+        assert!(style.shadow.is_none());
+    }
+
+    #[test]
+    fn test_mat_style_unknown_defaults_to_classic() {
+        let style = MatStyle::from_preset("unknown_preset");
+        assert_eq!(style.name, "classic");
+        assert_eq!(style.background_color, "#f5f2eb");
+    }
+
+    #[test]
+    fn test_mat_style_empty_string_defaults_to_classic() {
+        let style = MatStyle::from_preset("");
+        assert_eq!(style.name, "classic");
+    }
+
+    #[test]
+    fn test_preset_names_contains_all_presets() {
+        let names = MatStyle::preset_names();
+        assert!(names.contains(&"classic"));
+        assert!(names.contains(&"modern"));
+        assert!(names.contains(&"gallery"));
+        assert!(names.contains(&"minimal"));
+        assert!(names.contains(&"rich"));
+        assert!(names.contains(&"none"));
+    }
+
+    #[test]
+    fn test_preset_names_count() {
+        assert_eq!(MatStyle::preset_names().len(), 6);
+    }
+
+    #[test]
+    fn test_all_preset_names_produce_matching_styles() {
+        for name in MatStyle::preset_names() {
+            let style = MatStyle::from_preset(name);
+            assert_eq!(style.name, *name, "Preset '{}' should produce style with matching name", name);
+        }
+    }
+
+    #[test]
+    fn test_mat_style_serialization() {
+        let style = MatStyle::from_preset("modern");
+        let json = serde_json::to_string(&style).unwrap();
+        assert!(json.contains("\"name\":\"modern\""));
+        assert!(json.contains("\"background_color\":\"#ffffff\""));
+        assert!(json.contains("\"shadow\":"));
+    }
+
+    #[test]
+    fn test_mat_style_deserialization() {
+        let json = r##"{"name":"custom","background_color":"#000","padding":"1rem","shadow":null,"inner_border":null}"##;
+        let style: MatStyle = serde_json::from_str(json).unwrap();
+        assert_eq!(style.name, "custom");
+        assert_eq!(style.background_color, "#000");
+        assert_eq!(style.padding, "1rem");
+        assert!(style.shadow.is_none());
     }
 }
