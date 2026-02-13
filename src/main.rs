@@ -135,7 +135,7 @@ async fn main() -> Result<()> {
         .nest_service("/admin", admin_spa)
         .fallback_service(viewer_spa);
 
-    let addr = "0.0.0.0:300";
+    let addr = "0.0.0.0:3000";
     let listener = TcpListener::bind(addr).await?;
     info!("Serving on http://{addr}");
     axum::serve(listener, app).await?;
