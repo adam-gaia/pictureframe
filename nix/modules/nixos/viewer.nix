@@ -38,25 +38,26 @@ in {
       enable = true;
       user = cfg.user;
       program = "${pkgs.firefox}/bin/firefox --kiosk --private-window ${cfg.url}";
+      environment = {
+        # Needed so cage doesnt block without input devices
+        # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
+        WLR_LIBINPUT_NO_DEVICES = "1";
+      };
     };
 
-    environment = {
+    environment.sessionVariables = {
       # Ensure Firefox uses Wayland natively under Cage
       MOZ_ENABLE_WAYLAND = "1";
-
-      # Needed so cage doesnt block without input devices
-      # https://github.com/cage-kiosk/cage/wiki/Troubleshooting#cage-does-not-start-without-any-input-devices
-      WLR_LIBINPUT_NO_DEVICES = "1";
     };
 
     # GPU / graphics support for the Pi
     hardware.graphics.enable = true;
-  };
 
-  systemd.services."cage-tty1" = {
-    after = [
-      "network-online.target"
-      "systemd-resolved.service"
-    ];
+    systemd.services."cage-tty1" = {
+      after = [
+        "network-online.target"
+        "systemd-resolved.service"
+      ];
+    };
   };
 }
