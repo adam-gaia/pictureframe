@@ -13,7 +13,14 @@ in {
     package = lib.mkOption {
       type = lib.types.package;
       description = "The pictureframe package to use.";
-      default = flake.packages."${pkgs.system}".default;
+      # TODO: when using this module, I kept getting the error 'no flake input'
+      # default = flake.packages."${pkgs.system}".default;
+    };
+
+    # TODO: once we figure out why 'flake' input wont work we can get ride of this option
+    distDir = lib.mkOption {
+      type = lib.types.path;
+      description = "Dist dir to serve";
     };
 
     debug = lib.mkOption {
@@ -38,6 +45,10 @@ in {
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
 
+      path = [
+        pkgs.imagemagick # TODO: instead of duplicating, take runtimeInputs from nix/lib/default.nix
+      ];
+
       environment =
         {
           XDG_CONFIG_HOME = "/var/lib/pictureframe/.config";
@@ -50,7 +61,7 @@ in {
         };
 
       serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} --dist-dir ${flake.packages.${pkgs.system}.frontend}";
+        ExecStart = "${lib.getExe cfg.package} --dist-dir ${cfg.distDir}"; # TODO: same issue with flake input from ${flake.packages.${pkgs.system}.frontend}";
         Restart = "on-failure";
         RestartSec = 5;
 
