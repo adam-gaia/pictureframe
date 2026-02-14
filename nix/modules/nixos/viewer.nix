@@ -16,7 +16,7 @@
       rm -rf ${userHome}/.mozilla
       rm -rf ${userHome}/.cache/mozilla
 
-      exec "${pkgs.firefox}/bin/firefox" --new-instance --kiosk ${cfg.url} #--new-instance --safe-mode ${cfg.url}
+      exec "${pkgs.firefox}/bin/firefox" --new-instance --kiosk ${cfg.url}
     '';
 in {
   options.services.pictureframeViewer = {
@@ -46,11 +46,8 @@ in {
     };
     users.groups.${cfg.user} = {};
 
-    programs.firefox = let
-      firefox-package = mk-firefox-kiosk cfg.user;
-    in {
+    programs.firefox = {
       enable = true;
-      package = firefox-package;
       policies = {
         DisableTelemetry = true;
         DisableFirefoxStudies = true;
